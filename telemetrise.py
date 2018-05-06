@@ -24,6 +24,11 @@ def main(command):
 
 			# a specs must match the length and width of the string
 			# To render into window, use linesplit: linesplit(green(''.join(s.decode('latin-1') for s in self.received)), 80) if self.received else ['']
+
+			# TODO: split per line and create a list of lines.
+			# reverse the order
+
+
 			if command_output != '':
 				rendered_output = linesplit(''.join(s for s in command_output), wwidth_left_end)
 				for i, line in zip(reversed(range(2,wheight)), reversed(rendered_output)):
@@ -35,8 +40,7 @@ def main(command):
 			# Now read input from main spawn
 			res = None
 			try:
-				#res=pexpect_session.read_nonblocking(timeout=1)
-				res=pexpect_session.readline()
+				res=pexpect_session.read_nonblocking(timeout=1)
 			except pexpect.EOF:
 				command_output += 'EOF'
 			except:
