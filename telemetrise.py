@@ -11,7 +11,7 @@ def main(command):
 	command_pid = pexpect_session.pid
 	pexpect.run('kill -STOP $PID')
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
-	# or not installed. TODO
+	# or not installed. Also, what about root? TODO
 	strace_session = pexpect.spawn('strace -f -p $PID')
 	pexpect.run('kill -CONT $PID')
 
@@ -23,45 +23,44 @@ def main(command):
 			wwidth  = window.width
 			a = curtsies.FSArray(wheight,wwidth)
 
-			# Divide the screen up into two, to keep it simple for now
+			# Divide the screen up into two, to keep it simple for now
 			wheight_top_end    = int(wheight / 2)
 			wheight_bottom_start = int(wheight / 2) + 1
 
+			# Header
 			header_text = 'telemetrise running on command: ' + command + ' ' + str(wheight) + 'x' + str(wwidth)
 			a[0:1,0:len(header_text)] = [blue(header_text)]
 
-			# a specs must match the length and width of the string
-			# To render into window, use linesplit: linesplit(green(''.join(s.decode('latin-1') for s in self.received)), 80) if self.received else ['']
-
-			# TODO: split per line and create a list of lines.
-			# reverse the order
-
+			# Split the lines by newline, then reversed and zip up with line 2 to halfway.
 			if command_output != '':
-				rendered_output = linesplit(''.join(s for s in command_output), wwidth_left_end)
-				for i, line in zip(reversed(range(2,wheight_top_end)), reversed(rendered_output)):
+				lines = command_output.split('\r\n')
+				for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
 					a[i:i+1, 0:len(line)] = [line]
 
 			# We're done, now render!
+			#write_to_logfile(a)
 			window.render_to_terminal(a)
 
 			# Now read input from main spawn
-			res = None
-			try:
-				res=pexpect_session.read_nonblocking(timeout=1)
-			except pexpect.EOF:
-				command_output += 'EOF'
-			except:
-				command_output += '?'
-			if res:
-				command_output += res.decode('utf-8')
-				#outfile.write(command_output)
-				#outfile.write('=====\n')
-				#outfile.flush()
+			char = None
+			# 'while' keeps it line-oriented for reasonable performance...
+			while char != '\n':
+				try:
+					char=pexpect_session.read_nonblocking(timeout=1)
+				except pexpect.EOF:
+					command_output += 'EOF'
+				except:
+					command_output += '?'
+				if char:
+					command_output += char.decode('utf-8')
 
-# TODO: unique the strace file
 command = 'ping -c100 google.com'
+logfile = open('outfile','w')
 
-outfile = open('outfile','w')
+def write_to_logfile(msg):
+	global logfile
+	logfile.write(str(msg) + '\n')
+	logfile.flush()
 
 if __name__ == '__main__':
 	main(command)
