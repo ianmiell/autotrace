@@ -7,15 +7,45 @@ from curtsies.fmtfuncs import blue, red, green
 from curtsies.formatstring import linesplit
 
 
+# TODO: create 'holder' class for all the sessions
+class PexpectSession:
+	def __init__(self,command,encoding='utf-8'):
+		self.command               = command
+		self.pid                   = -1
+		self.top_left_position     = -1
+		self.bottom_right_position = -1
+		self.output                = ''
+		self.pexpect_session       = pexpect.spawn(command)
+		self.encoding              = 'utf-8'
+
+	def read_nonblocking(self,timeout=1):
+		assert self.pexpect_session
+		char = None
+		try:
+			char=self.pexpect_session.read_nonblocking(timeout=1)
+		except pexpect.EOF:
+			output += '\n--DONE--'
+			self.pexpect_session = None
+		except pexpect.TIMEOUT:
+			# This is ok.
+			pass
+		except:
+			self.output += '\nERROR! Unrecognised error in read_nonblocking\n'
+		if char:
+			self.output += char.decode(self.encoding)
+			return True
+		return False
+
+		
+
 def main(command):
-	# TODO: put in global object
-	command_session = pexpect.spawn(command)
-	command_pid = command_session.pid
-	pexpect.run('kill -STOP ' + str(command_pid))
+	command_pexpect_session = PexpectSession(command)
+	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
+
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
-	strace_session = pexpect.spawn('strace -f -p ' + str(command_pid))
-	pexpect.run('kill -CONT ' + str(command_pid))
+	strace_pexpect_session = PexpectSession('strace -f -p ' + str(command_pexpect_session.pid))
+	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
 
 	command_output = ''
 	strace_output = ''
@@ -63,27 +93,13 @@ def main(command):
 			# Now read input from main spawn
 			char = None
 			# 'while' keeps it line-oriented for reasonable performance...
-			while char != '\n':
-				if command_session:
-					try:
-						char=command_session.read_nonblocking(timeout=1)
-					except pexpect.EOF:
-						command_output += '\nDONE'
-						command_session = None
-					except:
-						command_output += '?'
-					if char:
-						command_output += char.decode('utf-8')
-				if strace_session:
-					try:
-						char=strace_session.read_nonblocking(timeout=1)
-					except pexpect.EOF:
-						strace_output += '\nDONE'
-						strace_session = None
-					except:
-						strace_output += '?'
-					if char:
-						strace_output += char.decode('utf-8')
+			while True:
+				if command_pexpect_session:
+					if command_pexpect_session.read_nonblocking():
+						break
+				if strace_pexpect_session:
+					strace_pexpect_session.read_nonblocking()
+						break
 
 
 # TODO: object for each session
