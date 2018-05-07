@@ -63,19 +63,19 @@ class PexpectSession:
 	def wrap_output(self, width):
 		# TODO
 		lines = self.output.split('\r\n')
-		write_to_logfile('width' + str(width))
-		write_to_logfile('lines')
-		write_to_logfile(str(lines))
+		#write_to_logfile('width' + str(width))
+		#write_to_logfile('lines')
+		#write_to_logfile(str(lines))
 		lines_new = []
 		for line in lines:
-			write_to_logfile('line')
-			write_to_logfile(str(line))
+			#write_to_logfile('line')
+			#write_to_logfile(str(line))
 			while len(line) > width-1:
 				lines_new.append(line[:width-1])
 				line = line[width-1:]
 			lines_new.append(line)
-		write_to_logfile('lines_new')
-		write_to_logfile(str(lines_new))
+		#write_to_logfile('lines_new')
+		#write_to_logfile(str(lines_new))
 		self.output = '\r\n'.join(lines_new)
 		return True
 
@@ -127,6 +127,15 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	return s
 
 
+def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_manager):
+	sudo = 'sudo '
+	if os.getuid() == 0:
+		sudo = ''
+	this_platform = platform.system()
+	command = 'vmstat 1 '
+	return PexpectSession(command,pexpect_session_manager)
+
+
 def main(command,pexpect_session_manager):
 	input_char = ''
 
@@ -139,6 +148,7 @@ def main(command,pexpect_session_manager):
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
+	vmstat_pexpect_session   = setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
@@ -168,8 +178,8 @@ def main(command,pexpect_session_manager):
 				lines = command_pexpect_session.get_lines(wwidth)
 				# TODO: abstract this
 				for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
-					write_to_logfile(line)
-					write_to_logfile(len(line))
+					#write_to_logfile(line)
+					#write_to_logfile(len(line))
 					a[i:i+1, 0:len(line)] = [green(line)]
 
 			# Bottom left for strace output
@@ -177,37 +187,56 @@ def main(command,pexpect_session_manager):
 				lines = strace_pexpect_session.get_lines(wwidth_left_end)
 				# TODO: abstract this
 				for i, line in zip(reversed(range(wheight_bottom_start,wheight-2)), reversed(lines)):
-					#line = line[:50]
 					a[i:i+1, 0:len(line)] = [red(line)]
 
+			# Bottom left for strace output
+			if vmstat_pexpect_session.output != '':
+				lines = vmstat_pexpect_session.get_lines(wwidth_left_end)
+				# TODO: abstract this
+				for i, line in zip(reversed(range(wheight_bottom_start,wheight-2)), reversed(lines)):
+					a[i:i+1, wwidth_right_start:wwidth_right_start+len(line)] = [red(line)]
+
+
 			# Footer
-			footer_text = '(x) to do ' + str(input_char)
+			footer_text = '(ESC/q) to quit '
 			a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
 
 			# We're done, now render!
 			#write_to_logfile(a)
 			window.render_to_terminal(a)
 
-			# 'while' keeps it line-oriented for reasonable performance...
-			seen_output = False
-			while not seen_output:
-				if command_pexpect_session:
-					if command_pexpect_session.read_line():
-						seen_output = True
-				if strace_pexpect_session:
-					if strace_pexpect_session.read_line():
-						seen_output = True
-			#  TODO: slows everything down, make it only check every once in a while
-			with Input() as input_generator:
-				input_char = input_generator.send(.001)
-				if input_char:
-					input_char = repr(input_char.encode('utf-8'))
-					write_to_logfile('input_char')
-					write_to_logfile(input_char)
-					if input_char == "'q'":
-						sys.exit(0)
+			handle_sessions(command_pexpect_session,strace_pexpect_session,vmstat_pexpect_session)
+			handle_input()
+
+
+def handle_sessions(command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session):
+	seen_output = False
+	# 'while' keeps it line-oriented for reasonable performance...
+	while not seen_output:
+		if command_pexpect_session:
+			if command_pexpect_session.read_line():
+				seen_output = True
+		if strace_pexpect_session:
+			if strace_pexpect_session.read_line():
+				seen_output = True
+		if vmstat_pexpect_session:
+			if vmstat_pexpect_session.read_line():
+				seen_output = True
+
+
+def handle_input():
+	# Handle input
+	with Input() as input_generator:
+		input_char = input_generator.send(.01)
+		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
+			sys.exit(0)
+		elif input_char:
+			write_to_logfile('input_char')
+			write_to_logfile(input_char)
+
 
 if __name__ == '__main__':
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager()
 	main(args.command,pexpect_session_manager)
+
