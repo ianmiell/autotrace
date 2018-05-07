@@ -5,6 +5,7 @@ import time
 import sys
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.formatstring import linesplit
+from curtsies.input import *
 
 
 # Set up a logfile for debugging
@@ -57,6 +58,8 @@ class PexpectSession:
 
 
 def main(command):
+	input_chars = ''
+
 	command_pexpect_session = PexpectSession(command)
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
@@ -101,7 +104,7 @@ def main(command):
 					a[i:i+1, 0:len(line)] = [red(line)]
 
 			# Footer
-			footer_text = '(x) to do '
+			footer_text = '(x) to do ' + input_chars
 			a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
 
 			# We're done, now render!
@@ -119,12 +122,15 @@ def main(command):
 				if strace_pexpect_session:
 					if strace_pexpect_session.read_nonblocking():
 						seen_output = True
+			with Input() as input_generator:
+				input_char = input_generator.send(.001)
+				if input_char:
+					input_chars += repr(input_char)
+				
 
 
 # TODO: command line arg
 command = 'ping -c100 google.com'
-
-# TODO: handle user input
 
 
 if __name__ == '__main__':
