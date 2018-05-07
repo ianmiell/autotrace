@@ -15,9 +15,21 @@ from curtsies.formatstring import linesplit
 from curtsies.input import *
 
 
+# TODO: Create logfile for each process, to write output to.
+# TODO: When all processes done, quit.
 # TODO: create 'holder' class for all the sessions
+
+class PexpectSessionManager:
+	def __init__(self):
+		# Singleton
+		assert self.only_one is None
+		self.only_one         = True
+		self.pexpect_sessions = []
+
+
 class PexpectSession:
-	def __init__(self,command,encoding='utf-8'):
+
+	def __init__(self,command,session_manager,encoding='utf-8'):
 		self.command               = command
 		self.top_left_position     = -1
 		self.bottom_right_position = -1
@@ -34,14 +46,14 @@ class PexpectSession:
 			res = self.pexpect_session.expect('\r\n',timeout=timeout)
 			string = self.pexpect_session.before + '\r\n'
 		except pexpect.EOF:
-                        write_to_logfile('Command session: done ' + self.command)
+			write_to_logfile('Command session: done ' + self.command)
 			self.pexpect_session = None
 		except pexpect.TIMEOUT:
 			# This is ok.
-                        write_to_logfile('Timeout in command session: ' + self.command)
+			write_to_logfile('Timeout in command session: ' + self.command)
 			pass
 		except:
-                        write_to_logfile('Error in command session: ' + self.command)
+			write_to_logfile('Error in command session: ' + self.command)
 		if string:
 			self.output += string.decode(self.encoding)
 			return True
@@ -62,6 +74,7 @@ class PexpectSession:
 	def get_lines(self,width):
 		self.wrap_output(width)
 		return self.output.split('\r\n')
+
 
 
 # Set up a logfile for debugging
@@ -91,7 +104,7 @@ def check_syscall_tracer_ready():
 	return False, ''
 
 
-def setup_syscall_tracer(command_pexpect_session, sudo_password):
+def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager):
 	sudo = """echo '""" + sudo_password + """' | sudo -S """
 	sudo = 'sudo '
 	if os.getuid() == 0:
@@ -99,14 +112,14 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password):
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command)
+		s = PexpectSession(command,pexpect_session_manager)
 	else:
 		command = sudo + 'strace -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command)
+		s = PexpectSession(command,pexpect_session_manager)
 	return s
 
 
-def main(command):
+def main(command,pexpect_session_manager):
 	input_chars = ''
 
 	res, sudo_password = check_syscall_tracer_ready()
@@ -114,10 +127,10 @@ def main(command):
 		print('Either become root or make sure sudo is ready to run without password')
 		sys.exit(1)
 
-	command_pexpect_session = PexpectSession(command)
+	command_pexpect_session = PexpectSession(command,pexpect_session_manager)
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
-	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password)
+	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
@@ -132,9 +145,9 @@ def main(command):
 			assert wwidth >= 80
 
 			# Divide the screen up into two, to keep it simple for now
-			wheight_top_end      = int(wheight / 2)
+			wheight_top_end	  = int(wheight / 2)
 			wheight_bottom_start = int(wheight / 2) + 1
-			wwidth_left_end      = int(wwidth / 2)
+			wwidth_left_end	  = int(wwidth / 2)
 			wwidth_right_start   = int(wwidth / 2) + 1
 
 			# Header
@@ -147,8 +160,8 @@ def main(command):
 				lines = command_pexpect_session.get_lines(wwidth)
 				# TODO: abstract this
 				for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
-                                        write_to_logfile(line)
-                                        write_to_logfile(len(line))
+					write_to_logfile(line)
+					write_to_logfile(len(line))
 					a[i:i+1, 0:len(line)] = [green(line)]
 
 			# Bottom left for strace output
@@ -184,4 +197,5 @@ def main(command):
 
 if __name__ == '__main__':
 	args = process_args()
-	main(args.command)
+	pexpect_session_manager=PexpectSessionManager()
+	main(args.command,pexpect_session_manager)
