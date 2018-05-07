@@ -135,7 +135,7 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	return s
 
 
-def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_manager):
+def setup_vmstat_tracer(pexpect_session_manager):
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = 'iostat 1 '
