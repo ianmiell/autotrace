@@ -49,7 +49,14 @@ class PexpectSession:
 
 	def wrap_output(self, width):
 		# TODO
-		self.output = self.output
+		lines = self.output.split('\r\n')
+		lines_new = []
+		for line in lines:
+			while len(line) > width-1:
+				lines_new += line[:width-1]
+				line = line[width-1:]
+			lines_new += line
+		self.output = '\r\n'.join(lines_new)
 		return True
 
 	def get_lines(self,width):
@@ -149,7 +156,7 @@ def main(command):
 				lines = strace_pexpect_session.get_lines(wwidth_left_end)
 				# TODO: abstract this
 				for i, line in zip(reversed(range(wheight_bottom_start,wheight-2)), reversed(lines)):
-					line = line[:50]
+					#line = line[:50]
 					a[i:i+1, 0:len(line)] = [red(line)]
 
 			# Footer
