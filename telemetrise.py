@@ -20,6 +20,7 @@ from curtsies.input import *
 # TODO: create 'holder' class for all the sessions
 
 class PexpectSessionManager:
+	only_one = None
 	def __init__(self):
 		# Singleton
 		assert self.only_one is None
@@ -62,12 +63,19 @@ class PexpectSession:
 	def wrap_output(self, width):
 		# TODO
 		lines = self.output.split('\r\n')
+		write_to_logfile('width' + str(width))
+		write_to_logfile('lines')
+		write_to_logfile(str(lines))
 		lines_new = []
 		for line in lines:
+			write_to_logfile('line')
+			write_to_logfile(str(line))
 			while len(line) > width-1:
-				lines_new += line[:width-1]
+				lines_new.append(line[:width-1])
 				line = line[width-1:]
-			lines_new += line
+			lines_new.append(line)
+		write_to_logfile('lines_new')
+		write_to_logfile(str(lines_new))
 		self.output = '\r\n'.join(lines_new)
 		return True
 
@@ -120,7 +128,7 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 
 
 def main(command,pexpect_session_manager):
-	input_chars = ''
+	input_char = ''
 
 	res, sudo_password = check_syscall_tracer_ready()
 	if not res:
@@ -173,7 +181,7 @@ def main(command,pexpect_session_manager):
 					a[i:i+1, 0:len(line)] = [red(line)]
 
 			# Footer
-			footer_text = '(x) to do ' + input_chars
+			footer_text = '(x) to do ' + str(input_char)
 			a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
 
 			# We're done, now render!
@@ -190,10 +198,14 @@ def main(command,pexpect_session_manager):
 					if strace_pexpect_session.read_line():
 						seen_output = True
 			#  TODO: slows everything down, make it only check every once in a while
-			#with Input() as input_generator:
-			#	input_char = input_generator.send(.001)
-			#	if input_char:
-			#		input_chars += repr(input_char)
+			with Input() as input_generator:
+				input_char = input_generator.send(.001)
+				if input_char:
+					input_char = repr(input_char.encode('utf-8'))
+					write_to_logfile('input_char')
+					write_to_logfile(input_char)
+					if input_char == "'q'":
+						sys.exit(0)
 
 if __name__ == '__main__':
 	args = process_args()
