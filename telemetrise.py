@@ -6,16 +6,17 @@ import sys
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.formatstring import linesplit
 
+
 def main(command):
-	pexpect_session = pexpect.spawn(command)
-	command_pid = pexpect_session.pid
+	# TODO: put in global object
+	command_session = pexpect.spawn(command)
+	command_pid = command_session.pid
 	pexpect.run('kill -STOP $PID')
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
 	strace_session = pexpect.spawn('strace -f -p $PID')
 	pexpect.run('kill -CONT $PID')
 
-	command_output = ''
 	with curtsies.FullscreenWindow() as window:
 		while True:
 			# Setup
@@ -46,16 +47,29 @@ def main(command):
 			# 'while' keeps it line-oriented for reasonable performance...
 			while char != '\n':
 				try:
-					char=pexpect_session.read_nonblocking(timeout=1)
+					char=command_session.read_nonblocking(timeout=0.1)
 				except pexpect.EOF:
 					command_output += 'EOF'
 				except:
 					command_output += '?'
 				if char:
 					command_output += char.decode('utf-8')
+				try:
+					char=strace_session.read_nonblocking(timeout=0.1)
+				except pexpect.EOF:
+					strace_output += 'EOF'
+				except:
+					strace_output += '?'
+				if char:
+					strace_output += char.decode('utf-8')
 
+
+# TODO: object for each session
 command = 'ping -c100 google.com'
+command_output = ''
+strace_output = ''
 logfile = open('outfile','w')
+
 
 def write_to_logfile(msg):
 	global logfile
