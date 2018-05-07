@@ -20,26 +20,46 @@ from curtsies.input import *
 # TODO: create 'holder' class for all the sessions
 
 class PexpectSessionManager:
+
 	only_one = None
-	def __init__(self):
+
+	def __init__(self, logfile='outfile'):
 		# Singleton
 		assert self.only_one is None
 		self.only_one         = True
 		self.pexpect_sessions = []
+		self.logfile = open(logfile,'w')
+
+	def write_to_logfile(self, msg):
+		self.logfile.write(str(msg) + '\n')
+		self.logfile.flush()
+	
 
 
 class PexpectSession:
 
-	def __init__(self,command,session_manager,encoding='utf-8'):
-		self.command               = command
-		self.top_left_position     = -1
-		self.bottom_right_position = -1
-		self.output                = ''
-		self.pexpect_session       = pexpect.spawn(command)
-		self.pid                   = self.pexpect_session.pid
-		self.encoding              = 'utf-8'
+	def __init__(self,command, pexpect_session_manager, is_main_command=False, encoding='utf-8'):
+		self.is_main_command         = is_main_command
+		self.command                 = command
+		self.top_left_position       = -1
+		self.bottom_right_position   = -1
+		self.output                  = ''
+		self.pexpect_session         = pexpect.spawn(command)
+		self.pid                     = self.pexpect_session.pid
+		self.encoding                = 'utf-8'
+		self.pexpect_session_manager = pexpect_session_manager
+		self.top_left                = (-1,-1)
+		self.bottom_right            = (-1,-1)
+		# Append to sessions
+		pexpect_session_manager.pexpect_sessions.append(self.pexpect_session)
+
+	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
+		self.top_left     = (top_left_x, top_left_y)
+		self.bottom_right = (bottom_right_x, bottom_right_y)
 
 	def read_line(self,timeout=0.1):
+		assert self.top_left     != (-1,-1)
+		assert self.bottom_right != (-1,-1)
 		if not self.pexpect_session:
 			return False
 		string = None
@@ -47,35 +67,27 @@ class PexpectSession:
 			res = self.pexpect_session.expect('\r\n',timeout=timeout)
 			string = self.pexpect_session.before + '\r\n'
 		except pexpect.EOF:
-			write_to_logfile('Command session: done ' + self.command)
+			self.pexpect_session_manager.write_to_logfile('Command session: done ' + self.command)
 			self.pexpect_session = None
 		except pexpect.TIMEOUT:
 			# This is ok.
-			write_to_logfile('Timeout in command session: ' + self.command)
+			self.pexpect_session_manager.write_to_logfile('Timeout in command session: ' + self.command)
 			pass
 		except:
-			write_to_logfile('Error in command session: ' + self.command)
+			self.pexpect_session_manager.write_to_logfile('Error in command session: ' + self.command)
 		if string:
 			self.output += string.decode(self.encoding)
 			return True
 		return False
 
 	def wrap_output(self, width):
-		# TODO
 		lines = self.output.split('\r\n')
-		#write_to_logfile('width' + str(width))
-		#write_to_logfile('lines')
-		#write_to_logfile(str(lines))
 		lines_new = []
 		for line in lines:
-			#write_to_logfile('line')
-			#write_to_logfile(str(line))
 			while len(line) > width-1:
 				lines_new.append(line[:width-1])
 				line = line[width-1:]
 			lines_new.append(line)
-		#write_to_logfile('lines_new')
-		#write_to_logfile(str(lines_new))
 		self.output = '\r\n'.join(lines_new)
 		return True
 
@@ -84,13 +96,6 @@ class PexpectSession:
 		return self.output.split('\r\n')
 
 
-
-# Set up a logfile for debugging
-logfile = open('outfile','w')
-def write_to_logfile(msg):
-	global logfile
-	logfile.write(str(msg) + '\n')
-	logfile.flush()
 
 
 def process_args():
@@ -120,10 +125,10 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager)
+		s = PexpectSession(command,pexpect_session_manager,is_main_command=False)
 	else:
 		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager)
+		s = PexpectSession(command,pexpect_session_manager,is_main_command=False)
 	return s
 
 
@@ -133,7 +138,7 @@ def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_
 		sudo = ''
 	this_platform = platform.system()
 	command = 'vmstat 1 '
-	return PexpectSession(command,pexpect_session_manager)
+	return PexpectSession(command,pexpect_session_manager,is_main_command=False)
 
 
 def main(command,pexpect_session_manager):
@@ -144,7 +149,7 @@ def main(command,pexpect_session_manager):
 		print('Either become root or make sure sudo is ready to run without password')
 		sys.exit(1)
 
-	command_pexpect_session = PexpectSession(command,pexpect_session_manager)
+	command_pexpect_session = PexpectSession(command,pexpect_session_manager,is_main_command=True)
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
@@ -155,58 +160,64 @@ def main(command,pexpect_session_manager):
 
 	with curtsies.FullscreenWindow() as window:
 		while True:
-			# Setup
-			wheight = window.height
-			wwidth  = window.width
-			a = curtsies.FSArray(wheight,wwidth)
-			assert wheight >= 24
-			assert wwidth >= 80
-
-			# Divide the screen up into two, to keep it simple for now
-			wheight_top_end	  = int(wheight / 2)
-			wheight_bottom_start = int(wheight / 2) + 1
-			wwidth_left_end	  = int(wwidth / 2)
-			wwidth_right_start   = int(wwidth / 2) + 1
-
-			# Header
-			header_text = 'telemetrising command: ' + command + ' ' + str(wheight) + 'x' + str(wwidth)
-			a[0:1,0:len(header_text)] = [blue(header_text)]
-
-			# Top half for command output
-			# Split the lines by newline, then reversed and zip up with line 2 to halfway.
-			if command_pexpect_session.output != '':
-				lines = command_pexpect_session.get_lines(wwidth)
-				# TODO: abstract this
-				for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
-					#write_to_logfile(line)
-					#write_to_logfile(len(line))
-					a[i:i+1, 0:len(line)] = [green(line)]
-
-			# Bottom left for strace output
-			if strace_pexpect_session.output != '':
-				lines = strace_pexpect_session.get_lines(wwidth_left_end)
-				# TODO: abstract this
-				for i, line in zip(reversed(range(wheight_bottom_start,wheight-2)), reversed(lines)):
-					a[i:i+1, 0:len(line)] = [red(line)]
-
-			# Bottom left for strace output
-			if vmstat_pexpect_session.output != '':
-				lines = vmstat_pexpect_session.get_lines(wwidth_left_end)
-				# TODO: abstract this
-				for i, line in zip(reversed(range(wheight_bottom_start,wheight-2)), reversed(lines)):
-					a[i:i+1, wwidth_right_start:wwidth_right_start+len(line)] = [red(line)]
-
-
-			# Footer
-			footer_text = 'ESC/q to quit, p to pause, c to continue'
-			a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
-
-			# We're done, now render!
-			#write_to_logfile(a)
-			window.render_to_terminal(a)
-
+			build_page(window, command, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session, 'Running')
 			handle_sessions(command_pexpect_session,strace_pexpect_session,vmstat_pexpect_session)
-			handle_input()
+			handle_input(pexpect_session_manager)
+
+
+def build_page(window, command, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session, info):
+	# Setup
+	wheight = window.height
+	wwidth  = window.width
+	a = curtsies.FSArray(wheight,wwidth)
+	assert wheight >= 24
+	assert wwidth >= 80
+
+	# Divide the screen up into two, to keep it simple for now
+	wheight_top_end	     = int(wheight / 2)
+	wheight_bottom_start = int(wheight / 2) + 1
+	wwidth_left_end	     = int(wwidth / 2)
+	wwidth_right_start   = int(wwidth / 2) + 1
+
+	# Header
+	header_text = 'telemetrising command: ' + command + ' ' + str(wheight) + 'x' + str(wwidth)
+	a[0:1,0:len(header_text)] = [blue(header_text)]
+
+	# Top half for command output
+	# Split the lines by newline, then reversed and zip up with line 2 to halfway.
+	command_pexpect_session.set_position(0,0,wwidth,wheight_bottom_start-1)
+	if command_pexpect_session.output != '':
+		lines = command_pexpect_session.get_lines(wwidth)
+		# TODO: abstract this
+		for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
+			a[i:i+1, 0:len(line)] = [green(line)]
+
+	# Bottom left for strace output
+	strace_pexpect_session.set_position(0,wheight_bottom_start,wwidth_left_end,wheight-1)
+	if strace_pexpect_session.output != '':
+		lines = strace_pexpect_session.get_lines(wwidth_left_end)
+		# TODO: abstract this
+		for i, line in zip(reversed(range(wheight_bottom_start,wheight-1)), reversed(lines)):
+			a[i:i+1, 0:len(line)] = [red(line)]
+
+	# Bottom right for vmstat output
+	vmstat_pexpect_session.set_position(wwidth_right_start,wheight_bottom_start,wwidth,wheight-1)
+	if vmstat_pexpect_session.output != '':
+		lines = vmstat_pexpect_session.get_lines(wwidth_left_end)
+		# TODO: abstract this
+		for i, line in zip(reversed(range(wheight_bottom_start,wheight-1)), reversed(lines)):
+			a[i:i+1, wwidth_right_start:wwidth_right_start+len(line)] = [red(line)]
+
+	# Footer
+	quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
+	space =  (wwidth - (len(info) + len(quick_help)))*' '
+	footer_text = info + space + quick_help
+	#footer_text = info + 'ESC/q to quit, p to pause, c to continue'
+	a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
+
+	# We're done, now render!
+	window.render_to_terminal(a)
+
 
 
 def handle_sessions(command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session):
@@ -224,20 +235,26 @@ def handle_sessions(command_pexpect_session, strace_pexpect_session, vmstat_pexp
 				seen_output = True
 
 
-def handle_input():
+def handle_input(pexpect_session_manager):
 	# Handle input
 	with Input() as input_generator:
 		input_char = input_generator.send(.01)
 		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
-			sys.exit(0)
+			quit()
 		elif input_char in (u'p',):
 			input_char = input_generator
 			for e in input_generator:
 				if e == 'c':
 					break
+				if e == 'q':
+					quit()
 		elif input_char:
-			write_to_logfile('input_char')
-			write_to_logfile(input_char)
+			pexpect_session_manager.write_to_logfile('input_char')
+			pexpect_session_manager.write_to_logfile(input_char)
+
+def quit(msg=''):
+	# TODO: close window, leave useful message
+	sys.exit(0)
 
 
 if __name__ == '__main__':
