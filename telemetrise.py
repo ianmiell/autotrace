@@ -27,7 +27,7 @@ class PexpectSessionManager:
 		assert self.only_one is None
 		self.only_one             = True
 		self.pexpect_sessions     = []
-		self.logfile              = open(logfile,'w')
+		self.logfile              = open(logfile,'w+')
 		self.status               = 'Running'
 		self.main_command_session = None
 
@@ -52,9 +52,9 @@ class PexpectSession:
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
-		self.logfile                 = open(logfile + '_' + name + '.output'
+		self.logfile                 = open(logfile + '_' + name + '.output','w+')
 		# Append to sessions
-		pexpect_session_manager.pexpect_sessions.append(self.pexpect_session)
+		self.pexpect_session_manager.pexpect_sessions.append(self.pexpect_session)
 		if self.name == 'main_command':
 			pexpect_session_manager.main_command_session = self
 
@@ -134,10 +134,10 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager,'syscall_command',pexpect_session_manager)
+		s = PexpectSession(command,pexpect_session_manager,'syscall_command')
 	else:
 		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager,'syscall_command',pexpect_session_manager)
+		s = PexpectSession(command,pexpect_session_manager,'syscall_command')
 	return s
 
 
@@ -146,8 +146,11 @@ def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_
 	if os.getuid() == 0:
 		sudo = ''
 	this_platform = platform.system()
-	command = 'vmstat 1 '
-	return PexpectSession(command,pexpect_session_manager,'vmstat_command',pexpect_session_manager)
+	if this_platform == 'Darwin':
+		command = 'iostat 1 '
+	else:
+		command = 'vmstat 1 '
+	return PexpectSession(command,pexpect_session_manager,'vmstat_command')
 
 
 def main(command,pexpect_session_manager):
@@ -157,7 +160,7 @@ def main(command,pexpect_session_manager):
 		print('Either become root or make sure sudo is ready to run without password')
 		sys.exit(1)
 
-	command_pexpect_session = PexpectSession(command,pexpect_session_manager,'main_command',pexpect_session_manager)
+	command_pexpect_session = PexpectSession(command,pexpect_session_manager,'main_command')
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
