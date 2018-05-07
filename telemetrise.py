@@ -1,6 +1,9 @@
 from __future__ import unicode_literals
+from __future__ import print_function
 import pexpect
 import curtsies
+import platform
+import subprocess
 import time
 import sys
 from curtsies.fmtfuncs import blue, red, green
@@ -56,16 +59,37 @@ class PexpectSession:
 		self.wrap_output(width)
 		return self.output.split('\r\n')
 
+def check_syscall_tracer_ready():
+	# If we have sudo, then this returns True, else false.
+	if os.getuid() == 0 or subprocess.Popen(['sudo','-n','echo']):
+		return True
+	sys.exit(1)
+	return False
+
+
+def setup_syscall_tracer():
+	sudo = 'sudo '
+	if os.getuid() == 0:
+		sudo = ''
+	platform = platform.system()
+	if platform == 'Darwin':
+		return PexpectSession(sudo + ' dtruss -f -p ' + str(command_pexpect_session.pid))
+	else:
+		return PexpectSession(sudo + ' strace -f -p ' + str(command_pexpect_session.pid))
+
 
 def main(command):
 	input_chars = ''
+
+	if not check_syscall_tracer_ready():
+		print('Either become root or make sure sudo is ready to run without password')
+		sys.exit(1)
 
 	command_pexpect_session = PexpectSession(command)
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
-	strace_pexpect_session = PexpectSession('strace -f -p ' + str(command_pexpect_session.pid))
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
 
 	with curtsies.FullscreenWindow() as window:
