@@ -156,8 +156,6 @@ def main(command,pexpect_session_manager):
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
 	vmstat_pexpect_session   = setup_vmstat_tracer(pexpect_session_manager)
-	# Assumes strace exists... need to correct/handle cases where not, eg mac
-	# or not installed. Also, what about root? TODO
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
 
 	with curtsies.FullscreenWindow() as window:
@@ -167,6 +165,7 @@ def main(command,pexpect_session_manager):
 			handle_input(pexpect_session_manager)
 
 
+# TODO simplify build_page
 def build_page(window, pexpect_session_manager, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session):
 	# Setup
 	wheight    = window.height
