@@ -121,8 +121,11 @@ def main(command):
 						seen_output = True
 
 
-# TODO: object for each session
+# TODO: command line arg
 command = 'ping -c100 google.com'
+
+# TODO: handle user input
+
 
 if __name__ == '__main__':
 	main(command)
