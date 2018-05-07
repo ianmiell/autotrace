@@ -15,7 +15,6 @@ from curtsies.formatstring import linesplit
 from curtsies.input import *
 
 
-# TODO: Create logfile for each process, to write output to.
 # TODO: When all processes done, quit.
 # TODO: create 'holder' class for all the sessions
 
@@ -26,20 +25,23 @@ class PexpectSessionManager:
 	def __init__(self, logfile='outfile'):
 		# Singleton
 		assert self.only_one is None
-		self.only_one         = True
-		self.pexpect_sessions = []
-		self.logfile = open(logfile,'w')
+		self.only_one             = True
+		self.pexpect_sessions     = []
+		self.logfile              = open(logfile,'w')
+		self.status               = 'Running'
+		self.main_command_session = None
 
 	def write_to_logfile(self, msg):
 		self.logfile.write(str(msg) + '\n')
 		self.logfile.flush()
+
 	
 
 
 class PexpectSession:
 
-	def __init__(self,command, pexpect_session_manager, is_main_command=False, encoding='utf-8'):
-		self.is_main_command         = is_main_command
+	def __init__(self,command, pexpect_session_manager, name, logfile='outfile', encoding='utf-8'):
+		self.name                    = name
 		self.command                 = command
 		self.top_left_position       = -1
 		self.bottom_right_position   = -1
@@ -50,12 +52,19 @@ class PexpectSession:
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
+		self.logfile                 = open(logfile + '_' + name + '.output'
 		# Append to sessions
 		pexpect_session_manager.pexpect_sessions.append(self.pexpect_session)
+		if self.name == 'main_command':
+			pexpect_session_manager.main_command_session = self
 
 	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
 		self.top_left     = (top_left_x, top_left_y)
 		self.bottom_right = (bottom_right_x, bottom_right_y)
+
+	def write_to_logfile(self):
+		self.logfile.write(str(msg) + '\n')
+		self.logfile.flush()
 
 	def read_line(self,timeout=0.1):
 		assert self.top_left     != (-1,-1)
@@ -125,10 +134,10 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager,is_main_command=False)
+		s = PexpectSession(command,pexpect_session_manager,'syscall_command',pexpect_session_manager)
 	else:
 		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager,is_main_command=False)
+		s = PexpectSession(command,pexpect_session_manager,'syscall_command',pexpect_session_manager)
 	return s
 
 
@@ -138,7 +147,7 @@ def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_
 		sudo = ''
 	this_platform = platform.system()
 	command = 'vmstat 1 '
-	return PexpectSession(command,pexpect_session_manager,is_main_command=False)
+	return PexpectSession(command,pexpect_session_manager,'vmstat_command',pexpect_session_manager)
 
 
 def main(command,pexpect_session_manager):
@@ -149,7 +158,7 @@ def main(command,pexpect_session_manager):
 		print('Either become root or make sure sudo is ready to run without password')
 		sys.exit(1)
 
-	command_pexpect_session = PexpectSession(command,pexpect_session_manager,is_main_command=True)
+	command_pexpect_session = PexpectSession(command,pexpect_session_manager,'main_command',pexpect_session_manager)
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
@@ -160,18 +169,19 @@ def main(command,pexpect_session_manager):
 
 	with curtsies.FullscreenWindow() as window:
 		while True:
-			build_page(window, command, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session, 'Running')
+			build_page(window, pexpect_session_manager, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session)
 			handle_sessions(command_pexpect_session,strace_pexpect_session,vmstat_pexpect_session)
 			handle_input(pexpect_session_manager)
 
 
-def build_page(window, command, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session, info):
+def build_page(window, pexpect_session_manager, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session):
 	# Setup
-	wheight = window.height
-	wwidth  = window.width
-	a = curtsies.FSArray(wheight,wwidth)
+	wheight    = window.height
+	wwidth     = window.width
+	screen_arr = curtsies.FSArray(wheight,wwidth)
 	assert wheight >= 24
 	assert wwidth >= 80
+	command = pexpect_session_manager.main_command_session.command
 
 	# Divide the screen up into two, to keep it simple for now
 	wheight_top_end	     = int(wheight / 2)
@@ -181,7 +191,7 @@ def build_page(window, command, command_pexpect_session, strace_pexpect_session,
 
 	# Header
 	header_text = 'telemetrising command: ' + command + ' ' + str(wheight) + 'x' + str(wwidth)
-	a[0:1,0:len(header_text)] = [blue(header_text)]
+	screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 
 	# Top half for command output
 	# Split the lines by newline, then reversed and zip up with line 2 to halfway.
@@ -190,7 +200,7 @@ def build_page(window, command, command_pexpect_session, strace_pexpect_session,
 		lines = command_pexpect_session.get_lines(wwidth)
 		# TODO: abstract this
 		for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
-			a[i:i+1, 0:len(line)] = [green(line)]
+			screen_arr[i:i+1, 0:len(line)] = [green(line)]
 
 	# Bottom left for strace output
 	strace_pexpect_session.set_position(0,wheight_bottom_start,wwidth_left_end,wheight-1)
@@ -198,7 +208,7 @@ def build_page(window, command, command_pexpect_session, strace_pexpect_session,
 		lines = strace_pexpect_session.get_lines(wwidth_left_end)
 		# TODO: abstract this
 		for i, line in zip(reversed(range(wheight_bottom_start,wheight-1)), reversed(lines)):
-			a[i:i+1, 0:len(line)] = [red(line)]
+			screen_arr[i:i+1, 0:len(line)] = [red(line)]
 
 	# Bottom right for vmstat output
 	vmstat_pexpect_session.set_position(wwidth_right_start,wheight_bottom_start,wwidth,wheight-1)
@@ -206,17 +216,17 @@ def build_page(window, command, command_pexpect_session, strace_pexpect_session,
 		lines = vmstat_pexpect_session.get_lines(wwidth_left_end)
 		# TODO: abstract this
 		for i, line in zip(reversed(range(wheight_bottom_start,wheight-1)), reversed(lines)):
-			a[i:i+1, wwidth_right_start:wwidth_right_start+len(line)] = [red(line)]
+			screen_arr[i:i+1, wwidth_right_start:wwidth_right_start+len(line)] = [red(line)]
 
 	# Footer
 	quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
-	space =  (wwidth - (len(info) + len(quick_help)))*' '
-	footer_text = info + space + quick_help
-	#footer_text = info + 'ESC/q to quit, p to pause, c to continue'
-	a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
+	space =  (wwidth - (len(pexpect_session_manager.status) + len(quick_help)))*' '
+
+	footer_text = pexpect_session_manager.status + space + quick_help
+	screen_arr[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
 
 	# We're done, now render!
-	window.render_to_terminal(a)
+	window.render_to_terminal(screen_arr)
 
 
 
@@ -242,9 +252,11 @@ def handle_input(pexpect_session_manager):
 		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
 			quit()
 		elif input_char in (u'p',):
+			pexpect_session_manager.status = 'Paused'
 			input_char = input_generator
 			for e in input_generator:
 				if e == 'c':
+					pexpect_session_manager.status = 'Running'
 					break
 				if e == 'q':
 					quit()
