@@ -4,33 +4,27 @@ import pexpect
 import curtsies
 import platform
 import subprocess
+import getpass
 import time
 import sys
+import argparse
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.formatstring import linesplit
 from curtsies.input import *
-
-
-# Set up a logfile for debugging
-logfile = open('outfile','w')
-def write_to_logfile(msg):
-	global logfile
-	logfile.write(str(msg) + '\n')
-	logfile.flush()
 
 
 # TODO: create 'holder' class for all the sessions
 class PexpectSession:
 	def __init__(self,command,encoding='utf-8'):
 		self.command               = command
-		self.pid                   = -1
 		self.top_left_position     = -1
 		self.bottom_right_position = -1
 		self.output                = ''
 		self.pexpect_session       = pexpect.spawn(command)
+		self.pid                   = self.pexpect_session.pid
 		self.encoding              = 'utf-8'
 
-	def read_nonblocking(self,timeout=1):
+	def read_nonblocking(self,timeout=0.001):
 		write_to_logfile('in read_nonblocking for command: ' + self.command)
 		if not self.pexpect_session:
 			return False
@@ -38,8 +32,9 @@ class PexpectSession:
 		try:
 			char = self.pexpect_session.read_nonblocking(timeout=timeout)
 		except pexpect.EOF:
-			self.output += '\n--DONE--'
-			self.pexpect_session = None
+			#self.output += '\n--DONE--'
+			#self.pexpect_session = None
+			pass
 		except pexpect.TIMEOUT:
 			# This is ok.
 			pass
@@ -59,35 +54,62 @@ class PexpectSession:
 		self.wrap_output(width)
 		return self.output.split('\r\n')
 
+
+# Set up a logfile for debugging
+logfile = open('outfile','w')
+def write_to_logfile(msg):
+	global logfile
+	logfile.write(str(msg) + '\n')
+	logfile.flush()
+
+
+def process_args():
+	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
+	parser.add_argument('--command', default='ping -c10 google.com')
+	return parser.parse_args()
+
 def check_syscall_tracer_ready():
 	# If we have sudo, then this returns True, else false.
-	if os.getuid() == 0 or subprocess.Popen(['sudo','-n','echo']):
-		return True
-	sys.exit(1)
-	return False
+	if os.getuid() == 0:
+		return True, ''
+	else:
+		# Insist on root for now
+		return False, ''
+	if os.geteuid() != 0:
+		#password = getpass.getpass("[sudo] password: ")
+		password = 'N/A'
+		return True, password
+	return False, ''
 
 
-def setup_syscall_tracer():
+def setup_syscall_tracer(command_pexpect_session, sudo_password):
+	sudo = """echo '""" + sudo_password + """' | sudo -S """
 	sudo = 'sudo '
 	if os.getuid() == 0:
 		sudo = ''
-	platform = platform.system()
-	if platform == 'Darwin':
-		return PexpectSession(sudo + ' dtruss -f -p ' + str(command_pexpect_session.pid))
+	this_platform = platform.system()
+	if this_platform == 'Darwin':
+		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
+		s = PexpectSession(command)
 	else:
-		return PexpectSession(sudo + ' strace -f -p ' + str(command_pexpect_session.pid))
+		command = sudo + 'strace -f -p ' + str(command_pexpect_session.pid)
+		s = PexpectSession(command)
+	write_to_logfile(command)
+	return s
 
 
 def main(command):
 	input_chars = ''
 
-	if not check_syscall_tracer_ready():
+	res, sudo_password = check_syscall_tracer_ready()
+	if not res:
 		print('Either become root or make sure sudo is ready to run without password')
 		sys.exit(1)
 
 	command_pexpect_session = PexpectSession(command)
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
+	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password)
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
@@ -146,16 +168,12 @@ def main(command):
 				if strace_pexpect_session:
 					if strace_pexpect_session.read_nonblocking():
 						seen_output = True
-			with Input() as input_generator:
-				input_char = input_generator.send(.001)
-				if input_char:
-					input_chars += repr(input_char)
-				
-
-
-# TODO: command line arg
-command = 'ping -c100 google.com'
-
+			#  TODO: slows everything down, make it only check every once in a while
+			#with Input() as input_generator:
+			#	input_char = input_generator.send(.001)
+			#	if input_char:
+			#		input_chars += repr(input_char)
 
 if __name__ == '__main__':
-	main(command)
+	args = process_args()
+	main(args.command)
