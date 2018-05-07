@@ -151,7 +151,6 @@ def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_
 
 
 def main(command,pexpect_session_manager):
-	input_char = ''
 
 	res, sudo_password = check_syscall_tracer_ready()
 	if not res:
