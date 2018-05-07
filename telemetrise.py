@@ -122,7 +122,7 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
 		s = PexpectSession(command,pexpect_session_manager)
 	else:
-		command = sudo + 'strace -f -p ' + str(command_pexpect_session.pid)
+		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
 		s = PexpectSession(command,pexpect_session_manager)
 	return s
 
@@ -198,7 +198,7 @@ def main(command,pexpect_session_manager):
 
 
 			# Footer
-			footer_text = '(ESC/q) to quit '
+			footer_text = 'ESC/q to quit, p to pause, c to continue'
 			a[wheight-1:wheight,0:len(footer_text)] = [blue(footer_text)]
 
 			# We're done, now render!
@@ -230,6 +230,11 @@ def handle_input():
 		input_char = input_generator.send(.01)
 		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
 			sys.exit(0)
+		elif input_char in (u'p',):
+			input_char = input_generator
+			for e in input_generator:
+				if e == 'c':
+					break
 		elif input_char:
 			write_to_logfile('input_char')
 			write_to_logfile(input_char)
