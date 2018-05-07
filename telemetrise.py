@@ -8,6 +8,8 @@ import getpass
 import time
 import sys
 import argparse
+import cProfile
+import re
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.formatstring import linesplit
 from curtsies.input import *
@@ -24,24 +26,24 @@ class PexpectSession:
 		self.pid                   = self.pexpect_session.pid
 		self.encoding              = 'utf-8'
 
-	def read_nonblocking(self,timeout=0.001):
-		write_to_logfile('in read_nonblocking for command: ' + self.command)
+	def read_line(self,timeout=0.1):
 		if not self.pexpect_session:
 			return False
-		char = None
+		string = None
 		try:
-			char = self.pexpect_session.read_nonblocking(timeout=timeout)
+			res = self.pexpect_session.expect('\r\n',timeout=timeout)
+			string = self.pexpect_session.before + '\r\n'
 		except pexpect.EOF:
-			#self.output += '\n--DONE--'
-			#self.pexpect_session = None
-			pass
+                        write_to_logfile('Command session: done ' + self.command)
+			self.pexpect_session = None
 		except pexpect.TIMEOUT:
 			# This is ok.
+                        write_to_logfile('Timeout in command session: ' + self.command)
 			pass
 		except:
-			self.output += '\nERROR! Unrecognised error in read_nonblocking\n'
-		if char:
-			self.output += char.decode(self.encoding)
+                        write_to_logfile('Error in command session: ' + self.command)
+		if string:
+			self.output += string.decode(self.encoding)
 			return True
 		return False
 
@@ -94,7 +96,6 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password):
 	else:
 		command = sudo + 'strace -f -p ' + str(command_pexpect_session.pid)
 		s = PexpectSession(command)
-	write_to_logfile(command)
 	return s
 
 
@@ -139,6 +140,8 @@ def main(command):
 				lines = command_pexpect_session.get_lines(wwidth)
 				# TODO: abstract this
 				for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
+                                        write_to_logfile(line)
+                                        write_to_logfile(len(line))
 					a[i:i+1, 0:len(line)] = [green(line)]
 
 			# Bottom left for strace output
@@ -157,16 +160,14 @@ def main(command):
 			#write_to_logfile(a)
 			window.render_to_terminal(a)
 
-			# Now read input from main spawn
-			char = None
 			# 'while' keeps it line-oriented for reasonable performance...
 			seen_output = False
 			while not seen_output:
 				if command_pexpect_session:
-					if command_pexpect_session.read_nonblocking():
+					if command_pexpect_session.read_line():
 						seen_output = True
 				if strace_pexpect_session:
-					if strace_pexpect_session.read_nonblocking():
+					if strace_pexpect_session.read_line():
 						seen_output = True
 			#  TODO: slows everything down, make it only check every once in a while
 			#with Input() as input_generator:
