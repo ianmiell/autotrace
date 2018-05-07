@@ -1,18 +1,13 @@
 from __future__ import unicode_literals
 from __future__ import print_function
-import pexpect
-import curtsies
-import platform
-import subprocess
-import getpass
-import time
-import sys
 import argparse
-import cProfile
-import re
+import platform
+import os
+import sys
+import curtsies
+import pexpect
 from curtsies.fmtfuncs import blue, red, green
-from curtsies.formatstring import linesplit
-from curtsies.input import *
+from curtsies.input import Input
 
 
 # TODO: When all processes done, quit.
@@ -73,7 +68,7 @@ class PexpectSession:
 			return False
 		string = None
 		try:
-			res = self.pexpect_session.expect('\r\n',timeout=timeout)
+			self.pexpect_session.expect('\r\n',timeout=timeout)
 			string = self.pexpect_session.before + '\r\n'
 		except pexpect.EOF:
 			self.pexpect_session_manager.write_to_logfile('Command session: done ' + self.command)
@@ -116,14 +111,13 @@ def check_syscall_tracer_ready():
 	# If we have sudo, then this returns True, else false.
 	if os.getuid() == 0:
 		return True, ''
-	else:
-		# Insist on root for now
-		return False, ''
-	if os.geteuid() != 0:
-		#password = getpass.getpass("[sudo] password: ")
-		password = 'N/A'
-		return True, password
+	# Insist on root for now
 	return False, ''
+	#if os.geteuid() != 0:
+	#	#password = getpass.getpass("[sudo] password: ")
+	#	password = 'N/A'
+	#	return True, password
+	#return False, ''
 
 
 def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager):
@@ -142,9 +136,6 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 
 
 def setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_manager):
-	sudo = 'sudo '
-	if os.getuid() == 0:
-		sudo = ''
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = 'iostat 1 '
@@ -164,7 +155,7 @@ def main(command,pexpect_session_manager):
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
-	vmstat_pexpect_session   = setup_vmstat_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
+	vmstat_pexpect_session   = setup_vmstat_tracer(pexpect_session_manager)
 	# Assumes strace exists... need to correct/handle cases where not, eg mac
 	# or not installed. Also, what about root? TODO
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
@@ -275,4 +266,3 @@ if __name__ == '__main__':
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager()
 	main(args.command,pexpect_session_manager)
-
