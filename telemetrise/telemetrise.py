@@ -11,7 +11,8 @@ from curtsies.input import Input
 
 
 # TODO: When all processes done, quit.
-# TODO: create 'holder' class for all the sessions
+# TODO: create 'holder' class for all the sessions and cycle through
+# TODO: make session command optional, with PID as a placeholder
 
 class PexpectSessionManager:
 
@@ -22,9 +23,11 @@ class PexpectSessionManager:
 		assert self.only_one is None
 		self.only_one             = True
 		self.pexpect_sessions     = []
-		self.logfile              = open(logfile,'w+')
 		self.status               = 'Running'
 		self.main_command_session = None
+		# TODO: logfile: put in code dir ../logs
+		self.logfile              = open(logfile,'w+')
+		os.chmod(logfile,0o777)
 
 	def write_to_logfile(self, msg):
 		self.logfile.write(str(msg) + '\n')
@@ -69,7 +72,7 @@ class PexpectSession:
 		string = None
 		try:
 			self.pexpect_session.expect('\r\n',timeout=timeout)
-			string = self.pexpect_session.before + '\r\n'
+			string = self.pexpect_session.before.decode(self.encoding) + '\r\n'
 		except pexpect.EOF:
 			self.pexpect_session_manager.write_to_logfile('Command session: done ' + self.command)
 			self.pexpect_session = None
@@ -77,10 +80,11 @@ class PexpectSession:
 			# This is ok.
 			self.pexpect_session_manager.write_to_logfile('Timeout in command session: ' + self.command)
 			pass
-		except:
+		except Exception as e:
 			self.pexpect_session_manager.write_to_logfile('Error in command session: ' + self.command)
+			self.pexpect_session_manager.write_to_logfile(e)
 		if string:
-			self.output += string.decode(self.encoding)
+			self.output += string
 			return True
 		return False
 
@@ -128,6 +132,7 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
+		command = 'sleep 100'
 		s = PexpectSession(command,pexpect_session_manager,'syscall_command')
 	else:
 		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
@@ -139,6 +144,7 @@ def setup_vmstat_tracer(pexpect_session_manager):
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = 'iostat 1 '
+		command = 'sleep 100'
 	else:
 		command = 'vmstat 1 '
 	return PexpectSession(command,pexpect_session_manager,'vmstat_command')
@@ -155,7 +161,7 @@ def main(command,pexpect_session_manager):
 	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
 
 	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
-	vmstat_pexpect_session   = setup_vmstat_tracer(pexpect_session_manager)
+	vmstat_pexpect_session = setup_vmstat_tracer(pexpect_session_manager)
 	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
 
 	with curtsies.FullscreenWindow() as window:
