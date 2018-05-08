@@ -37,7 +37,6 @@ class PexpectSessionManager(object):
 		self.root_ready     = False
 		if os.getuid() == 0:
 			self.root_ready = True
-
 		# Setup
 		self.window               = curtsies.FullscreenWindow()
 		self.wheight              = self.window.height
@@ -60,11 +59,9 @@ class PexpectSessionManager(object):
 		window = self.window
 		# screen_arr in manager?
 		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
-	
 		# Header
 		header_text = 'telemetrising ...' + str(self.wheight) + 'x' + str(self.wwidth)
 		screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
-	
 		# Gather sessions
 		bottom_left_session = None
 		bottom_right_session = None
@@ -79,7 +76,6 @@ class PexpectSessionManager(object):
 		assert bottom_right_session
 		assert bottom_left_session
 		assert main_command_session
-	
 		# Top half for command output
 		# Split the lines by newline, then reversed and zip up with line 2 to halfway.
 		if main_command_session.output != '':
@@ -87,30 +83,26 @@ class PexpectSessionManager(object):
 			# TODO: abstract this
 			for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [green(line)]
-	
 		# Bottom left for strace output
 		if bottom_left_session.output != '':
 			lines = bottom_left_session.get_lines(self.wwidth_left_end)
 			# TODO: abstract this
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [red(line)]
-	
 		# Bottom right for vmstat output
 		if bottom_right_session.output != '':
 			lines = bottom_right_session.get_lines(self.wwidth_left_end)
 			# TODO: abstract this
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 				screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
-	
 		# Footer
 		quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
-	
 		footer_text = self.status + space + quick_help
 		screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
-	
 		# We're done, now render.
 		window.render_to_terminal(screen_arr)
+
 
 	def quit_telemetrise(self, msg='All done.'):
 		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
@@ -119,12 +111,14 @@ class PexpectSessionManager(object):
 		print(msg)
 		sys.exit(0)
 
+
 	def handle_sessions(self):
 		seen_output = False
 		while not seen_output:
 			for session in self.pexpect_sessions:
 				if session.read_line():
 					seen_output = True
+
 
 	def handle_input(self):
 		with Input() as input_generator:
@@ -133,10 +127,12 @@ class PexpectSessionManager(object):
 				self.quit_telemetrise()
 			elif input_char in (u'p',):
 				self.status = 'Paused'
+				self.pause_sessions()
 				self.build_page()
 				input_char = input_generator
 				for e in input_generator:
 					if e == 'c':
+						self.unpause_sessions()
 						self.status = 'Running'
 						self.build_page()
 						break
@@ -146,9 +142,9 @@ class PexpectSessionManager(object):
 				self.write_to_logfile('input_char')
 				self.write_to_logfile(input_char)
 
+
 	def setup_commands(self, args):
 		this_platform = platform.system()
-	
 		main_session = PexpectSession(args.command, self,'main_command')
 		main_session.spawn()
 		main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
@@ -181,15 +177,35 @@ class PexpectSessionManager(object):
 		return
 
 
+	def pause_sessions(self):
+		# TODO: handle sudo if needed
+		for session in self.pexpect_sessions:
+			if session.name == 'main_command':
+				pexpect.run('kill -STOP ' + str(session.pid))
+		for session in self.pexpect_sessions:
+			if session.name != 'main_command':
+				pexpect.run('kill -STOP ' + str(session.pid))
+
+
+	def unpause_sessions(self):
+		# TODO: handle sudo if needed
+		for session in self.pexpect_sessions:
+			if session.name != 'main_command':
+				pexpect.run('kill -CONT ' + str(session.pid))
+		for session in self.pexpect_sessions:
+			if session.name == 'main_command':
+				pexpect.run('kill -CONT ' + str(session.pid))
+
+
 
 
 class PexpectSession(object):
+
 
 	def __init__(self,command, pexpect_session_manager, name, encoding='utf-8'):
 		self.pexpect_session         = None
 		self.name                    = name
 		self.command                 = command
-
 		self.output                  = ''
 		self.pid                     = -1
 		self.encoding                = encoding
@@ -209,6 +225,7 @@ class PexpectSession(object):
 		if self.needs_root and not self.pexpect_session_manager.root_ready:
 			make_root_ready()
 
+
 	def __str__(self):
 		string = ''
 		string += '\nname: ' + str(self.name)
@@ -218,19 +235,23 @@ class PexpectSession(object):
 		string += '\nbottom_right: ' + str(self.bottom_right)
 		return string
 
+
 	def spawn(self):
 		self.pexpect_session         = pexpect.spawn(self.command)
 		self.pid                     = self.pexpect_session.pid
 		if self.name == 'main_command':
 			pexpect.run('kill -STOP ' + str(self.pid))
 
+
 	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
 		self.top_left     = (top_left_x, top_left_y)
 		self.bottom_right = (bottom_right_x, bottom_right_y)
 
+
 	def write_to_logfile(self, msg):
 		self.logfile.write(str(msg) + '\n')
 		self.logfile.flush()
+
 
 	def read_line(self,timeout=0.1):
 		assert self.top_left     != (-1,-1)
@@ -255,6 +276,7 @@ class PexpectSession(object):
 			return True
 		return False
 
+
 	def wrap_output(self, width):
 		lines = self.output.split('\r\n')
 		lines_new = []
@@ -265,6 +287,7 @@ class PexpectSession(object):
 			lines_new.append(line)
 		self.output = '\r\n'.join(lines_new)
 		return True
+
 
 	def get_lines(self,width):
 		self.wrap_output(width)
@@ -279,6 +302,7 @@ def process_args():
 	parser.add_argument('-l','--bottom_left_command', default=None)
 	parser.add_argument('-r','--bottom_right_command', default=None)
 	return parser.parse_args()
+
 
 def make_root_ready():
 	# If we have sudo, then this returns True, else false.
