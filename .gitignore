@@ -1,0 +1,11 @@
+dist/*
+telemetrise.egg-info/*
+*.pyc
+tags
+_trial_temp
+*.mo
+build/*
+env
+.DS_Store
+.idea/
+doc/sphinx/build/*
