@@ -22,7 +22,7 @@ setup(
     install_requires=['curtsies','pexpect'],
     entry_points={
         'console_scripts': [
-            'telemetrise=telemetrise.telemetrise:run',
+            'telemetrise=telemetrise.telemetrise:main',
         ],
     },
 )

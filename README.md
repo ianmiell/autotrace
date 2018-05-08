@@ -18,3 +18,11 @@ Requires/supports:
 - pip install pexpect
 
 - pip install curtsies
+
+## Examples
+
+Linux example with strace and vmstat
+
+```
+$ telemetrise --command 'find /' --bottom_left_window 'strace -p PID' --bottom_right_window 'vmstat 1'
+```
