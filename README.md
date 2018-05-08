@@ -11,7 +11,7 @@ sudo telemetrise -c 'nmap meirionconsulting.com' -l 'strace -p PID' -r 'tcpdump 
 
 [![asciicast](https://asciinema.org/a/NUXLnqDrc6rD48gd3KcbQT2Dq.png)](https://asciinema.org/a/NUXLnqDrc6rD48gd3KcbQT2Dq)
 
-Features:
+## Features:
 
 - Pause program in-flight to see what's going on
 
@@ -32,7 +32,7 @@ pip install telemetrise
 ```
 
 
-## Examples
+## Examples
 
 Mac example:
 
@@ -47,10 +47,10 @@ Linux example with strace and vmstat:
 
 ```
 $ sudo telemetrise -c 'find /' -l 'strace -p PID' -r 'vmstat 1'
-`
+```
 
-``
 Linux example with strace and tcpdump:
 
 ```
 $ sudo telemetrise -c 'nmap localhost' -l 'strace -p PID' -r 'tcpdump -XXs 20000'
+```
