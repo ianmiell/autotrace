@@ -28,6 +28,12 @@ class PexpectSessionManager:
 		# TODO: logfile: put in code dir ../logs
 		self.logfile              = open(logfile,'w+')
 		os.chmod(logfile,0o777)
+		# Does user have root?
+		res, self.sudo_password = check_root_ready()
+		if not res:
+			print('Either become root or make sure sudo is ready to run without password')
+			sys.exit(1)
+		self.root_ready           = res
 
 	def write_to_logfile(self, msg):
 		self.logfile.write(str(msg) + '\n')
@@ -39,22 +45,28 @@ class PexpectSessionManager:
 class PexpectSession:
 
 	def __init__(self,command, pexpect_session_manager, name, logfile='outfile', encoding='utf-8'):
+		self.pexpect_session         = None
 		self.name                    = name
 		self.command                 = command
 		self.top_left_position       = -1
 		self.bottom_right_position   = -1
 		self.output                  = ''
-		self.pexpect_session         = pexpect.spawn(command)
-		self.pid                     = self.pexpect_session.pid
+		self.pid                     = -1
 		self.encoding                = 'utf-8'
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
 		self.logfile                 = open(logfile + '_' + name + '.output','w+')
 		# Append to sessions
-		self.pexpect_session_manager.pexpect_sessions.append(self.pexpect_session)
+		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.name == 'main_command':
 			pexpect_session_manager.main_command_session = self
+
+	def spawn(self):
+		self.pexpect_session         = pexpect.spawn(self.command)
+		self.pid                     = self.pexpect_session.pid
+		if self.name == 'main_command':
+			pexpect.run('kill -STOP ' + str(self.pid))
 
 	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
 		self.top_left     = (top_left_x, top_left_y)
@@ -109,9 +121,11 @@ class PexpectSession:
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
 	parser.add_argument('--command', default='ping -c10 google.com')
+	parser.add_argument('--bottom_left_command', default=None)
+	parser.add_argument('--bottom_right_command', default=None)
 	return parser.parse_args()
 
-def check_syscall_tracer_ready():
+def check_root_ready():
 	# If we have sudo, then this returns True, else false.
 	if os.getuid() == 0:
 		return True, ''
@@ -124,53 +138,26 @@ def check_syscall_tracer_ready():
 	#return False, ''
 
 
-def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager):
-	sudo = """echo '""" + sudo_password + """' | sudo -S """
-	sudo = 'sudo '
-	if os.getuid() == 0:
-		sudo = ''
-	this_platform = platform.system()
-	if this_platform == 'Darwin':
-		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager,'syscall_command')
-	else:
-		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
-		s = PexpectSession(command,pexpect_session_manager,'syscall_command')
-	return s
+def main(pexpect_session_manager):
 
-
-def setup_vmstat_tracer(pexpect_session_manager):
-	this_platform = platform.system()
-	if this_platform == 'Darwin':
-		command = 'iostat 1 '
-	else:
-		command = 'vmstat 1 '
-	return PexpectSession(command,pexpect_session_manager,'vmstat_command')
-
-
-def main(command,pexpect_session_manager):
-
-	res, sudo_password = check_syscall_tracer_ready()
-	if not res:
-		print('Either become root or make sure sudo is ready to run without password')
-		sys.exit(1)
-
-	command_pexpect_session = PexpectSession(command,pexpect_session_manager,'main_command')
-	pexpect.run('kill -STOP ' + str(command_pexpect_session.pid))
-
-	strace_pexpect_session = setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session_manager)
-	vmstat_pexpect_session = setup_vmstat_tracer(pexpect_session_manager)
-	pexpect.run('kill -CONT ' + str(command_pexpect_session.pid))
+	main_command_session = None
+	for session in pexpect_session_manager.pexpect_sessions:
+		if session.name == 'main_command':
+			main_command_session = session
+		else:
+			session.spawn()
+	assert main_command_session
+	pexpect.run('kill -CONT ' + str(main_command_session.pid))
 
 	with curtsies.FullscreenWindow() as window:
 		while True:
-			build_page(window, pexpect_session_manager, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session)
-			handle_sessions(command_pexpect_session,strace_pexpect_session,vmstat_pexpect_session)
+			build_page(window, pexpect_session_manager)
+			handle_sessions(pexpect_session_manager)
 			handle_input(pexpect_session_manager)
 
 
 # TODO simplify build_page
-def build_page(window, pexpect_session_manager, command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session):
+def build_page(window, pexpect_session_manager):
 	# Setup
 	wheight    = window.height
 	wwidth     = window.width
@@ -189,27 +176,42 @@ def build_page(window, pexpect_session_manager, command_pexpect_session, strace_
 	header_text = 'telemetrising command: ' + command + ' ' + str(wheight) + 'x' + str(wwidth)
 	screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 
+	# Gather sessions
+	bottom_left_session = None
+	bottom_right_session = None
+	main_command_session = None
+	for session in pexpect_session_manager.pexpect_sessions:
+		if session.name == 'bottom_left_command':
+			bottom_left_session = session
+		elif session.name == 'bottom_right_command':
+			bottom_right_session = session
+		elif session.name == 'main_command':
+			main_command_session = session
+	assert bottom_right_session
+	assert bottom_left_session
+	assert main_command_session
+
 	# Top half for command output
 	# Split the lines by newline, then reversed and zip up with line 2 to halfway.
-	command_pexpect_session.set_position(0,0,wwidth,wheight_bottom_start-1)
-	if command_pexpect_session.output != '':
-		lines = command_pexpect_session.get_lines(wwidth)
+	main_command_session.set_position(0,0,wwidth,wheight_bottom_start-1)
+	if main_command_session.output != '':
+		lines = main_command_session.get_lines(wwidth)
 		# TODO: abstract this
 		for i, line in zip(reversed(range(2,wheight_top_end)), reversed(lines)):
 			screen_arr[i:i+1, 0:len(line)] = [green(line)]
 
 	# Bottom left for strace output
-	strace_pexpect_session.set_position(0,wheight_bottom_start,wwidth_left_end,wheight-1)
-	if strace_pexpect_session.output != '':
-		lines = strace_pexpect_session.get_lines(wwidth_left_end)
+	bottom_left_session.set_position(0,wheight_bottom_start,wwidth_left_end,wheight-1)
+	if bottom_left_session.output != '':
+		lines = bottom_left_session.get_lines(wwidth_left_end)
 		# TODO: abstract this
 		for i, line in zip(reversed(range(wheight_bottom_start,wheight-1)), reversed(lines)):
 			screen_arr[i:i+1, 0:len(line)] = [red(line)]
 
 	# Bottom right for vmstat output
-	vmstat_pexpect_session.set_position(wwidth_right_start,wheight_bottom_start,wwidth,wheight-1)
-	if vmstat_pexpect_session.output != '':
-		lines = vmstat_pexpect_session.get_lines(wwidth_left_end)
+	bottom_right_session.set_position(wwidth_right_start,wheight_bottom_start,wwidth,wheight-1)
+	if bottom_right_session.output != '':
+		lines = bottom_right_session.get_lines(wwidth_left_end)
 		# TODO: abstract this
 		for i, line in zip(reversed(range(wheight_bottom_start,wheight-1)), reversed(lines)):
 			screen_arr[i:i+1, wwidth_right_start:wwidth_right_start+len(line)] = [red(line)]
@@ -226,23 +228,16 @@ def build_page(window, pexpect_session_manager, command_pexpect_session, strace_
 
 
 
-def handle_sessions(command_pexpect_session, strace_pexpect_session, vmstat_pexpect_session):
+def handle_sessions(pexpect_session_manager):
 	seen_output = False
-	# 'while' keeps it line-oriented for reasonable performance...
 	while not seen_output:
-		if command_pexpect_session:
-			if command_pexpect_session.read_line():
-				seen_output = True
-		if strace_pexpect_session:
-			if strace_pexpect_session.read_line():
-				seen_output = True
-		if vmstat_pexpect_session:
-			if vmstat_pexpect_session.read_line():
-				seen_output = True
+		for session in pexpect_session_manager.pexpect_sessions:
+			if session:
+				if session.read_line():
+					seen_output = True
 
 
 def handle_input(pexpect_session_manager):
-	# Handle input
 	with Input() as input_generator:
 		input_char = input_generator.send(.01)
 		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
@@ -260,17 +255,49 @@ def handle_input(pexpect_session_manager):
 			pexpect_session_manager.write_to_logfile('input_char')
 			pexpect_session_manager.write_to_logfile(input_char)
 
+def setup_commands(pexpect_session_manager, args):
+	sudo = """echo '""" + pexpect_session_manager.sudo_password + """' | sudo -S """
+	sudo = ''
+	if pexpect_session_manager.root_ready:
+		sudo = ''
+	this_platform = platform.system()
+
+	main_session = PexpectSession(args.command, pexpect_session_manager,'main_command')
+	main_session.spawn()
+	main_session.pid
+	# Default for bottom left is syscall tracer
+	if args.bottom_left_command is None:
+		if this_platform == 'Darwin':
+			command = sudo + 'dtruss -f -p ' + str(main_session.pid)
+			PexpectSession(command,pexpect_session_manager,'bottom_left_command')
+		else:
+			command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
+			PexpectSession(command,pexpect_session_manager,'bottom_left_command')
+	# Default for bottom right is vmstat
+	if args.bottom_right_command is None:
+		if this_platform == 'Darwin':
+			command = 'iostat 1 '
+		else:
+			command = 'vmstat 1 '
+	PexpectSession(command,pexpect_session_manager,'bottom_right_command')
+	return
+		
+
 def quit(msg=''):
 	# TODO: close window, leave useful message
 	sys.exit(0)
 
+# TODO: main command is default argument
+# TODO: bottom left command (defaults to strace)
+# TODO: bottom right command (defaults to vmstat)
+# TODO: top right command (defaults to vmstat)
 def run():
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager()
-	main(args.command,pexpect_session_manager)
+	setup_commands(pexpect_session_manager, args)
+	main(pexpect_session_manager)
 
 telemetrise_version='0.0.1'
-
 
 if __name__ == '__main__':
 	run()
