@@ -269,6 +269,8 @@ def run():
 	pexpect_session_manager=PexpectSessionManager()
 	main(args.command,pexpect_session_manager)
 
+telemetrise_version='0.0.1'
+
 
 if __name__ == '__main__':
 	run()
