@@ -268,18 +268,22 @@ def setup_commands(pexpect_session_manager, args):
 	# Default for bottom left is syscall tracer
 	if args.bottom_left_command is None:
 		if this_platform == 'Darwin':
-			command = sudo + 'dtruss -f -p ' + str(main_session.pid)
-			PexpectSession(command,pexpect_session_manager,'bottom_left_command')
+			bottom_left_command = sudo + 'dtruss -f -p ' + str(main_session.pid)
+			PexpectSession(args.bottom_left_command,pexpect_session_manager,'bottom_left_command')
 		else:
-			command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
-			PexpectSession(command,pexpect_session_manager,'bottom_left_command')
+			bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
+	else:
+		bottom_left_command = args.bottom_left_command
+	PexpectSession(bottom_left_command,pexpect_session_manager,'bottom_left_command')
 	# Default for bottom right is vmstat
 	if args.bottom_right_command is None:
 		if this_platform == 'Darwin':
-			command = 'iostat 1 '
+			bottom_right_command = 'iostat 1 '
 		else:
-			command = 'vmstat 1 '
-	PexpectSession(command,pexpect_session_manager,'bottom_right_command')
+			bottom_right_command = 'vmstat 1 '
+	else:
+		bottom_right_command = args.bottom_right_command
+	PexpectSession(bottom_right_command,pexpect_session_manager,'bottom_right_command')
 	return
 		
 
