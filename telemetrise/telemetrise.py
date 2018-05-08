@@ -132,7 +132,6 @@ def setup_syscall_tracer(command_pexpect_session, sudo_password, pexpect_session
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = sudo + 'dtruss -f -p ' + str(command_pexpect_session.pid)
-		command = 'sleep 100'
 		s = PexpectSession(command,pexpect_session_manager,'syscall_command')
 	else:
 		command = sudo + 'strace -ttt -f -p ' + str(command_pexpect_session.pid)
@@ -144,7 +143,6 @@ def setup_vmstat_tracer(pexpect_session_manager):
 	this_platform = platform.system()
 	if this_platform == 'Darwin':
 		command = 'iostat 1 '
-		command = 'sleep 100'
 	else:
 		command = 'vmstat 1 '
 	return PexpectSession(command,pexpect_session_manager,'vmstat_command')
