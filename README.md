@@ -3,14 +3,13 @@
 Runs a process, and gives you the output along with other telemetry on the
 process, all in one terminal window.
 
-Currently shows:
+Here's me seeing what nmap does by looking at strace and tcpdump.
 
-- strace
+[![asciicast](https://asciinema.org/a/NUXLnqDrc6rD48gd3KcbQT2Dq.png)](https://asciinema.org/a/NUXLnqDrc6rD48gd3KcbQT2Dq)
 
-- vmstat
+Features:
 
-but other suggestions are welcome.
-
+- Pause program in-flight to see what's going on
 
 ## Install
 
