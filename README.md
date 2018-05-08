@@ -11,20 +11,23 @@ Currently shows:
 
 but other suggestions are welcome.
 
-Requires/supports:
 
-- python3
+## Install
 
-- pip install pexpect
+```
+# Requires:
+# python (2 or 3)
+# pip
+pip install telemetrise
+```
 
-- pip install curtsies
 
 ## Examples
 
 Mac example:
 
 ```
-$ telemetrise -c 'find /' -l 'dtruss -f -p PID' -r 'iostat 1'
+$ sudo telemetrise -c 'find /' -l 'dtruss -f -p PID' -r 'iostat 1'
 ```
 
 PID is replaced with the PID of the main (-c) command
@@ -33,5 +36,11 @@ PID is replaced with the PID of the main (-c) command
 Linux example with strace and vmstat:
 
 ```
-$ telemetrise -c 'find /' -l 'strace -p PID' -r 'vmstat 1'
+$ sudo telemetrise -c 'find /' -l 'strace -p PID' -r 'vmstat 1'
+`
+
+``
+Linux example with strace and tcpdump:
+
 ```
+$ sudo telemetrise -c 'nmap localhost' -l 'strace -p PID' -r 'tcpdump -XXs 20000'
