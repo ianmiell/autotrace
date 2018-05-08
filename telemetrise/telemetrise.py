@@ -10,11 +10,8 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
-# TODO: When all processes done, quit.
-# TODO: catch-all error
 # TODO: main command is default argument
 # TODO: move cursor from top left
-# TODO: actually pause processes on pause
 
 class PexpectSessionManager(object):
 
