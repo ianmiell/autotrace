@@ -196,7 +196,7 @@ class PexpectSession(object):
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
-		self.logfilename             = pexpect_session_manager.tmpdir + '_' + name + '.output'
+		self.logfilename             = pexpect_session_manager.tmpdir + '/' + name + '.output'
 		self.logfile                 = open(self.logfilename,'w+')
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
