@@ -13,6 +13,7 @@ from curtsies.input import Input
 # TODO: When all processes done, quit.
 # TODO: catch-all error
 # TODO: main command is default argument
+# TODO: move cursor from top left
 
 class PexpectSessionManager(object):
 
@@ -145,9 +146,6 @@ class PexpectSessionManager(object):
 				self.write_to_logfile(input_char)
 
 	def setup_commands(self, args):
-		sudo = ''
-		if self.root_ready:
-			sudo = ''
 		this_platform = platform.system()
 	
 		main_session = PexpectSession(args.command, self,'main_command')
@@ -155,8 +153,13 @@ class PexpectSessionManager(object):
 		main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
 		if args.bottom_left_command is None:
+			# TODO: use password retrieved elsewhere and add command
+			#if self.root_ready:
+			#	sudo = ''
+			#else:
+			#	sudo = 'echo ' + password + ' | sudo -S -n echo && ')
+			sudo = ''
 			if this_platform == 'Darwin':
-				#TODO PID replace with pid
 				bottom_left_command = sudo + 'dtruss -f -p ' + str(main_session.pid)
 			else:
 				bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
@@ -303,8 +306,6 @@ def main():
 			pexpect_session_manager.handle_input()
 	except Exception as e:
 		pexpect_session_manager.quit_telemetrise()
-
-
 
 
 telemetrise_version='0.0.1'
