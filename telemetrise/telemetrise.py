@@ -264,8 +264,11 @@ def quit(msg=''):
 	# TODO: close window, leave useful message
 	sys.exit(0)
 
-
-if __name__ == '__main__':
+def run():
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager()
 	main(args.command,pexpect_session_manager)
+
+
+if __name__ == '__main__':
+	run()
