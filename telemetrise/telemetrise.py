@@ -14,6 +14,7 @@ from curtsies.input import Input
 # TODO: catch-all error
 # TODO: main command is default argument
 # TODO: move cursor from top left
+# TODO: actually pause processes on pause
 
 class PexpectSessionManager(object):
 
