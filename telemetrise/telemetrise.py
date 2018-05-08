@@ -10,33 +10,36 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
-
 # TODO: When all processes done, quit.
-# TODO: create 'holder' class for all the sessions and cycle through
-# TODO: make session command optional, with PID as a placeholder
-# TODO: short args telemetrise --command 'find /' --bottom_left_window 'strace -p PID' --bottom_right_window 'vmstat 1'
+# TODO: catch-all error
+# TODO: main command is default argument
 
 class PexpectSessionManager(object):
 
 	only_one = None
 
-	def __init__(self, logfile='outfile'):
+	def __init__(self):
 		# Singleton
 		assert self.only_one is None
 		self.only_one             = True
 		self.pexpect_sessions     = []
 		self.status               = 'Running'
 		self.main_command_session = None
-		# TODO: logfile: put in code dir ../logs
-		self.logfile              = open(logfile,'w+')
-		os.chmod(logfile,0o777)
+		self.pid                  = os.getpid()
+		self.tmpdir               = '/tmp/tmp_telemetrise/' + str(self.pid)
+		os.system('mkdir -p ' + self.tmpdir)
+		self.logfilename          = '/tmp/tmp_telemetrise/' + str(self.pid) + '/manager'
+		self.logfile              = open(self.logfilename,'w+')
+		os.chmod(self.logfilename,0o777)
 		# Does user have root?
-		res, self.sudo_password = check_root_ready()
-		self.root_ready           = res
+		self.root_ready     = False
+		if os.getuid() == 0:
+			self.root_ready = True
+
 		# Setup
-		self.window     = curtsies.FullscreenWindow()
-		self.wheight    = self.window.height
-		self.wwidth     = self.window.width
+		self.window               = curtsies.FullscreenWindow()
+		self.wheight              = self.window.height
+		self.wwidth               = self.window.width
 		# Divide the screen up into two, to keep it simple for now
 		self.wheight_top_end	  = int(self.wheight / 2)
 		self.wheight_bottom_start = int(self.wheight / 2) + 1
@@ -52,9 +55,10 @@ class PexpectSessionManager(object):
 
 
 
+
 class PexpectSession(object):
 
-	def __init__(self,command, pexpect_session_manager, name, logfile='outfile', encoding='utf-8'):
+	def __init__(self,command, pexpect_session_manager, name, encoding='utf-8'):
 		self.pexpect_session         = None
 		self.name                    = name
 		self.command                 = command
@@ -65,11 +69,18 @@ class PexpectSession(object):
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
-		self.logfile                 = open(logfile + '_' + name + '.output','w+')
+		self.logfilename             = pexpect_session_manager.tmpdir + '_' + name + '.output'
+		self.logfile                 = open(self.logfilename,'w+')
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.name == 'main_command':
 			pexpect_session_manager.main_command_session = self
+		if command.strip()[:4] == 'sudo':
+			self.needs_root = True
+		else:
+			self.needs_root              = False
+		if self.needs_root and not self.pexpect_session_manager.root_ready:
+			make_root_ready()
 
 	def __str__(self):
 		string = ''
@@ -142,15 +153,12 @@ def process_args():
 	parser.add_argument('-r','--bottom_right_command', default=None)
 	return parser.parse_args()
 
-def check_root_ready():
+def make_root_ready():
 	# If we have sudo, then this returns True, else false.
 	if os.getuid() == 0:
 		return True, ''
-	if False:
-		password = getpass.getpass("[sudo] password: ")
-		return False, password
-	else:
-		return False, ''
+	password = getpass.getpass("[sudo] password: ")
+	return True, password
 
 
 def main():
@@ -197,7 +205,6 @@ def build_page(pexpect_session_manager):
 	assert bottom_left_session
 	assert main_command_session
 
-
 	# Top half for command output
 	# Split the lines by newline, then reversed and zip up with line 2 to halfway.
 	if main_command_session.output != '':
@@ -227,7 +234,7 @@ def build_page(pexpect_session_manager):
 	footer_text = pexpect_session_manager.status + space + quick_help
 	screen_arr[pexpect_session_manager.wheight-1:pexpect_session_manager.wheight,0:len(footer_text)] = [blue(footer_text)]
 
-	# We're done, now render!
+	# We're done, now render.
 	window.render_to_terminal(screen_arr)
 
 
@@ -245,7 +252,7 @@ def handle_input(pexpect_session_manager):
 	with Input() as input_generator:
 		input_char = input_generator.send(.01)
 		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
-			quit_telemetrise()
+			quit_telemetrise(pexpect_session_manager)
 		elif input_char in (u'p',):
 			pexpect_session_manager.status = 'Paused'
 			input_char = input_generator
@@ -259,8 +266,8 @@ def handle_input(pexpect_session_manager):
 			pexpect_session_manager.write_to_logfile('input_char')
 			pexpect_session_manager.write_to_logfile(input_char)
 
+
 def setup_commands(pexpect_session_manager, args):
-	sudo = """echo '""" + pexpect_session_manager.sudo_password + """' | sudo -S """
 	sudo = ''
 	if pexpect_session_manager.root_ready:
 		sudo = ''
@@ -277,7 +284,7 @@ def setup_commands(pexpect_session_manager, args):
 		else:
 			bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
 	else:
-		bottom_left_command = args.bottom_left_command
+		bottom_left_command = args.bottom_left_command.replace('PID',str(main_session.pid))
 	bottom_left_session = PexpectSession(bottom_left_command,pexpect_session_manager,'bottom_left_command')
 	bottom_left_session.set_position(0,pexpect_session_manager.wheight_bottom_start,pexpect_session_manager.wwidth_left_end,pexpect_session_manager.wheight-1)
 	# Default for bottom right is vmstat
@@ -287,21 +294,20 @@ def setup_commands(pexpect_session_manager, args):
 		else:
 			bottom_right_command = 'vmstat 1 '
 	else:
-		bottom_right_command = args.bottom_right_command
+		bottom_right_command = args.bottom_right_command.replace('PID',str(main_session.pid))
 	bottom_right_session = PexpectSession(bottom_right_command,pexpect_session_manager,'bottom_right_command')
 	bottom_right_session.set_position(pexpect_session_manager.wwidth_right_start,pexpect_session_manager.wheight_bottom_start,pexpect_session_manager.wwidth,pexpect_session_manager.wheight-1)
 	return
 
 
-def quit_telemetrise(msg=''):
-	# TODO: close window, leave useful message
+def quit_telemetrise(pexpect_session_manager,msg='All done.'):
+	window = pexpect_session_manager.window
+	screen_arr = curtsies.FSArray(pexpect_session_manager.wheight,pexpect_session_manager.wwidth)
+	window.render_to_terminal(screen_arr)
+	# TODO: leave useful message
 	print(msg)
 	sys.exit(0)
 
-# TODO: main command is default argument
-# TODO: bottom left command (defaults to strace)
-# TODO: bottom right command (defaults to vmstat)
-# TODO: top right command (defaults to vmstat)
 
 telemetrise_version='0.0.1'
 

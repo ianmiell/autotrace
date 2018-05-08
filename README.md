@@ -21,8 +21,17 @@ Requires/supports:
 
 ## Examples
 
-Linux example with strace and vmstat
+Mac example:
 
 ```
-$ telemetrise --command 'find /' --bottom_left_window 'strace -p PID' --bottom_right_window 'vmstat 1'
+$ telemetrise -c 'find /' -l 'dtruss -f -p PID' -r 'iostat 1'
+```
+
+PID is replaced with the PID of the main (-c) command
+
+
+Linux example with strace and vmstat:
+
+```
+$ telemetrise -c 'find /' -l 'strace -p PID' -r 'vmstat 1'
 ```
