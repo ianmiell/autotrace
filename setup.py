@@ -14,7 +14,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='telemetrise',
-    version='0.0.1',
+ version='0.0.3',
     description='Telemetry on any command',
     author='Ian Miell',
     author_email='ian.miell@gmail.com',
