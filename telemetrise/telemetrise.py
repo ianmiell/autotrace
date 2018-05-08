@@ -54,6 +54,129 @@ class PexpectSessionManager(object):
 		self.logfile.flush()
 
 
+	def build_page(self):
+		window = self.window
+		# screen_arr in manager?
+		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
+	
+		# Header
+		header_text = 'telemetrising ...' + str(self.wheight) + 'x' + str(self.wwidth)
+		screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
+	
+		# Gather sessions
+		bottom_left_session = None
+		bottom_right_session = None
+		main_command_session = None
+		for session in self.pexpect_sessions:
+			if session.name == 'bottom_left_command':
+				bottom_left_session = session
+			elif session.name == 'bottom_right_command':
+				bottom_right_session = session
+			elif session.name == 'main_command':
+				main_command_session = session
+		assert bottom_right_session
+		assert bottom_left_session
+		assert main_command_session
+	
+		# Top half for command output
+		# Split the lines by newline, then reversed and zip up with line 2 to halfway.
+		if main_command_session.output != '':
+			lines = main_command_session.get_lines(self.wwidth)
+			# TODO: abstract this
+			for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
+				screen_arr[i:i+1, 0:len(line)] = [green(line)]
+	
+		# Bottom left for strace output
+		if bottom_left_session.output != '':
+			lines = bottom_left_session.get_lines(self.wwidth_left_end)
+			# TODO: abstract this
+			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
+				screen_arr[i:i+1, 0:len(line)] = [red(line)]
+	
+		# Bottom right for vmstat output
+		if bottom_right_session.output != '':
+			lines = bottom_right_session.get_lines(self.wwidth_left_end)
+			# TODO: abstract this
+			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
+				screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
+	
+		# Footer
+		quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
+		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
+	
+		footer_text = self.status + space + quick_help
+		screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
+	
+		# We're done, now render.
+		window.render_to_terminal(screen_arr)
+
+	def quit_telemetrise(self, msg='All done.'):
+		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
+		self.window.render_to_terminal(screen_arr)
+		# TODO: leave useful message
+		print(msg)
+		sys.exit(0)
+
+	def handle_sessions(self):
+		seen_output = False
+		while not seen_output:
+			for session in self.pexpect_sessions:
+				if session.read_line():
+					seen_output = True
+
+	def handle_input(self):
+		with Input() as input_generator:
+			input_char = input_generator.send(.01)
+			if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
+				self.quit_telemetrise()
+			elif input_char in (u'p',):
+				self.status = 'Paused'
+				self.build_page()
+				input_char = input_generator
+				for e in input_generator:
+					if e == 'c':
+						self.status = 'Running'
+						self.build_page()
+						break
+					if e == 'q':
+						quit()
+			elif input_char:
+				self.write_to_logfile('input_char')
+				self.write_to_logfile(input_char)
+
+	def setup_commands(self, args):
+		sudo = ''
+		if self.root_ready:
+			sudo = ''
+		this_platform = platform.system()
+	
+		main_session = PexpectSession(args.command, self,'main_command')
+		main_session.spawn()
+		main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
+		# Default for bottom left is syscall tracer
+		if args.bottom_left_command is None:
+			if this_platform == 'Darwin':
+				#TODO PID replace with pid
+				bottom_left_command = sudo + 'dtruss -f -p ' + str(main_session.pid)
+			else:
+				bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
+		else:
+			bottom_left_command = args.bottom_left_command.replace('PID',str(main_session.pid))
+		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left_command')
+		bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
+		# Default for bottom right is vmstat
+		if args.bottom_right_command is None:
+			if this_platform == 'Darwin':
+				bottom_right_command = 'iostat 1 '
+			else:
+				bottom_right_command = 'vmstat 1 '
+		else:
+			bottom_right_command = args.bottom_right_command.replace('PID',str(main_session.pid))
+		bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right_command')
+		bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+		return
+
+
 
 
 class PexpectSession(object):
@@ -164,149 +287,24 @@ def make_root_ready():
 def main():
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager()
-	setup_commands(pexpect_session_manager, args)
-	main_command_session = None
-	for session in pexpect_session_manager.pexpect_sessions:
-		if session.name == 'main_command':
-			main_command_session = session
-		else:
-			session.spawn()
-	assert main_command_session
-	pexpect.run('kill -CONT ' + str(main_command_session.pid))
-
-	while True:
-		build_page(pexpect_session_manager)
-		handle_sessions(pexpect_session_manager)
-		handle_input(pexpect_session_manager)
-
-
-# TODO simplify build_page
-def build_page(pexpect_session_manager):
-	window = pexpect_session_manager.window
-	# screen_arr in manager?
-	screen_arr = curtsies.FSArray(pexpect_session_manager.wheight,pexpect_session_manager.wwidth)
-
-	# Header
-	header_text = 'telemetrising ...' + str(pexpect_session_manager.wheight) + 'x' + str(pexpect_session_manager.wwidth)
-	screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
-
-	# Gather sessions
-	bottom_left_session = None
-	bottom_right_session = None
-	main_command_session = None
-	for session in pexpect_session_manager.pexpect_sessions:
-		if session.name == 'bottom_left_command':
-			bottom_left_session = session
-		elif session.name == 'bottom_right_command':
-			bottom_right_session = session
-		elif session.name == 'main_command':
-			main_command_session = session
-	assert bottom_right_session
-	assert bottom_left_session
-	assert main_command_session
-
-	# Top half for command output
-	# Split the lines by newline, then reversed and zip up with line 2 to halfway.
-	if main_command_session.output != '':
-		lines = main_command_session.get_lines(pexpect_session_manager.wwidth)
-		# TODO: abstract this
-		for i, line in zip(reversed(range(2,pexpect_session_manager.wheight_top_end)), reversed(lines)):
-			screen_arr[i:i+1, 0:len(line)] = [green(line)]
-
-	# Bottom left for strace output
-	if bottom_left_session.output != '':
-		lines = bottom_left_session.get_lines(pexpect_session_manager.wwidth_left_end)
-		# TODO: abstract this
-		for i, line in zip(reversed(range(pexpect_session_manager.wheight_bottom_start,pexpect_session_manager.wheight-1)), reversed(lines)):
-			screen_arr[i:i+1, 0:len(line)] = [red(line)]
-
-	# Bottom right for vmstat output
-	if bottom_right_session.output != '':
-		lines = bottom_right_session.get_lines(pexpect_session_manager.wwidth_left_end)
-		# TODO: abstract this
-		for i, line in zip(reversed(range(pexpect_session_manager.wheight_bottom_start,pexpect_session_manager.wheight-1)), reversed(lines)):
-			screen_arr[i:i+1, pexpect_session_manager.wwidth_right_start:pexpect_session_manager.wwidth_right_start+len(line)] = [red(line)]
-
-	# Footer
-	quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
-	space =  (pexpect_session_manager.wwidth - (len(pexpect_session_manager.status) + len(quick_help)))*' '
-
-	footer_text = pexpect_session_manager.status + space + quick_help
-	screen_arr[pexpect_session_manager.wheight-1:pexpect_session_manager.wheight,0:len(footer_text)] = [blue(footer_text)]
-
-	# We're done, now render.
-	window.render_to_terminal(screen_arr)
-
-
-
-def handle_sessions(pexpect_session_manager):
-	seen_output = False
-	while not seen_output:
+	try:
+		pexpect_session_manager.setup_commands(args)
+		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
-			if session:
-				if session.read_line():
-					seen_output = True
+			if session.name == 'main_command':
+				main_command_session = session
+			else:
+				session.spawn()
+		assert main_command_session
+		pexpect.run('kill -CONT ' + str(main_command_session.pid))
+		while True:
+			pexpect_session_manager.build_page()
+			pexpect_session_manager.handle_sessions()
+			pexpect_session_manager.handle_input()
+	except Exception as e:
+		pexpect_session_manager.quit_telemetrise()
 
 
-def handle_input(pexpect_session_manager):
-	with Input() as input_generator:
-		input_char = input_generator.send(.01)
-		if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
-			quit_telemetrise(pexpect_session_manager)
-		elif input_char in (u'p',):
-			pexpect_session_manager.status = 'Paused'
-			input_char = input_generator
-			for e in input_generator:
-				if e == 'c':
-					pexpect_session_manager.status = 'Running'
-					break
-				if e == 'q':
-					quit()
-		elif input_char:
-			pexpect_session_manager.write_to_logfile('input_char')
-			pexpect_session_manager.write_to_logfile(input_char)
-
-
-def setup_commands(pexpect_session_manager, args):
-	sudo = ''
-	if pexpect_session_manager.root_ready:
-		sudo = ''
-	this_platform = platform.system()
-
-	main_session = PexpectSession(args.command, pexpect_session_manager,'main_command')
-	main_session.spawn()
-	main_session.set_position(0,0,pexpect_session_manager.wwidth,pexpect_session_manager.wheight_bottom_start-1)
-	# Default for bottom left is syscall tracer
-	if args.bottom_left_command is None:
-		if this_platform == 'Darwin':
-			#TODO PID replace with pid
-			bottom_left_command = sudo + 'dtruss -f -p ' + str(main_session.pid)
-		else:
-			bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
-	else:
-		bottom_left_command = args.bottom_left_command.replace('PID',str(main_session.pid))
-	bottom_left_session = PexpectSession(bottom_left_command,pexpect_session_manager,'bottom_left_command')
-	bottom_left_session.set_position(0,pexpect_session_manager.wheight_bottom_start,pexpect_session_manager.wwidth_left_end,pexpect_session_manager.wheight-1)
-	# Default for bottom right is vmstat
-	if args.bottom_right_command is None:
-		if this_platform == 'Darwin':
-			bottom_right_command = 'iostat 1 '
-		else:
-			bottom_right_command = 'vmstat 1 '
-	else:
-		bottom_right_command = args.bottom_right_command.replace('PID',str(main_session.pid))
-	bottom_right_session = PexpectSession(bottom_right_command,pexpect_session_manager,'bottom_right_command')
-	bottom_right_session.set_position(pexpect_session_manager.wwidth_right_start,pexpect_session_manager.wheight_bottom_start,pexpect_session_manager.wwidth,pexpect_session_manager.wheight-1)
-	return
-
-
-def quit_telemetrise(pexpect_session_manager,msg='All done.'):
-	window = pexpect_session_manager.window
-	screen_arr = curtsies.FSArray(pexpect_session_manager.wheight,pexpect_session_manager.wwidth)
-	window.render_to_terminal(screen_arr)
-	# TODO: leave useful message
-	print(msg)
-	sys.exit(0)
 
 
 telemetrise_version='0.0.1'
