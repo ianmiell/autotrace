@@ -12,7 +12,7 @@ from curtsies.input import Input
 
 # TODO: When all processes done, quit.
 # TODO: create 'holder' class for all the sessions and cycle through
-# TODO: make session command optional, with PID as a placeholder
+# TODO: make session command optional, with PID as a placeholder
 
 class PexpectSessionManager:
 
