@@ -9,7 +9,7 @@ Here's me seeing what nmap does by looking at strace and tcpdump, with the comma
 sudo telemetrise -c 'nmap meirionconsulting.com' -l 'strace -p PID' -r 'tcpdump -XXs 20000'
 ```
 
-[![asciicast](https://asciinema.org/a/NUXLnqDrc6rD48gd3KcbQT2Dq.png)](https://asciinema.org/a/NUXLnqDrc6rD48gd3KcbQT2Dq)
+![Demo](https://raw.githubusercontent.com/ianmiell/telemetrise/master/demo.gif)
 
 ## Features:
 
