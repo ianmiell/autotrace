@@ -15,11 +15,13 @@ sudo telemetrise -c 'nmap meirionconsulting.com' -l 'strace -p PID' -r 'tcpdump 
 
 - Pause program in-flight to see what's going on
 
-- Supply PID to pane's command and it gets the main pid sub'd in (see example above)
+- Supply PID to pane's command and it gets the main pid sub'd in (see strace in the example above)
 
 - Colorised, multi-pane output
 
-- Output captured to files also (in `/tmp/tmptelemetrise/PID/*`)
+- Output of all commands captured to files (in `/tmp/tmptelemetrise/PID/*`)
+
+- Raise PR if you want other features
 
 
 ## Install
