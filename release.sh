@@ -14,7 +14,7 @@ do
 	datestr=$(date)
 	newpoint=$[point+1]
 	sed -i "s/\([ \s]\)*version=\(.\)$major.$minor.$point\(.\).*/\1version=\2$major.$minor.$newpoint\3,/" setup.py
-	sed -i "s/^telemetrise_version=\(.\)$major.$minor.[0-9][0-9]*\(.\).*/telemetrise_version=\1$major.$minor.$newpoint\2/" telemetrise.py
+	sed -i "s/^telemetrise_version=\(.\)$major.$minor.[0-9][0-9]*\(.\).*/telemetrise_version=\1$major.$minor.$newpoint\2/" telemetrise/telemetrise.py
 	python setup.py sdist bdist_wheel upload 
 	if [[ $? = 0 ]]
 	then

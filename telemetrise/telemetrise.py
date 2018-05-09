@@ -10,10 +10,11 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
-# TODO: main command is default argument
 # TODO: move cursor from top left
 # TODO: allow arbitrary numbers of commands and give option of cycling through them
 # TODO: implement help
+# TODO: revert screen at end
+# TODO: configurable log folder
 
 class PexpectSessionManager(object):
 
@@ -66,13 +67,13 @@ class PexpectSessionManager(object):
 				bottom_left_session = session
 			elif session.name == 'bottom_right_command':
 				bottom_right_session = session
-		# Validate BEGIN
+		# Validate BEGIN
 		assert main_command_session
 		assert bottom_left_session
 
 		if top_right_session and not bottom_right_session:
 			self.quit_telemetrise(msg='-t without -r is not allowed. Use -l or -r instead of -t')
-		# Validate DONE
+		# Validate DONE
 
 		window = self.window
 		# screen_arr in manager?
@@ -82,7 +83,7 @@ class PexpectSessionManager(object):
 		screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 
 		# Helper function to render subwindow - BUGGY?
-		# Test with: python telemetrise/telemetrise.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
+		# Test with: python telemetrise/telemetrise.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
 		def render_subwindow(lines, row_range_start, row_range_end, col_range_start, color):
 			for i, line in zip(reversed(range(row_range_start,row_range_end)), reversed(lines)):
 				screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
@@ -125,7 +126,11 @@ class PexpectSessionManager(object):
 	def quit_telemetrise(self, msg='All done.'):
 		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(screen_arr)
-		# TODO: leave useful message
+		# leave useful message
+		msg += '\nLogs and output in: ' + self.tmpdir
+		msg += '\nCommands were: '
+		for session in self.pexpect_sessions:
+			msg += '\n\t' + session.command
 		print(msg)
 		sys.exit(0)
 
