@@ -12,6 +12,8 @@ from curtsies.input import Input
 
 # TODO: main command is default argument
 # TODO: move cursor from top left
+# TODO: allow arbitrary numbers of commands and give option of cycling through them
+# TODO: implement help
 
 class PexpectSessionManager(object):
 
