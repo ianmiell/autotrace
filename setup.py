@@ -7,7 +7,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 setup(
     name='telemetrise',
- version='0.0.5',
+ version='0.0.6',
     description='Telemetry on any command',
     author='Ian Miell',
     author_email='ian.miell@gmail.com',
