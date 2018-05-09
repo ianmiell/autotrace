@@ -53,43 +53,65 @@ class PexpectSessionManager(object):
 
 
 	def draw_screen(self):
+		# Gather sessions
+		main_command_session, top_right_session, bottom_left_command, bottom_right_session = (None,)*4
+		for session in self.pexpect_sessions:
+			if session.name == 'main_command':
+				main_command_session = session
+			elif session.name == 'top_right_command':
+				top_right_session = session
+			elif session.name == 'bottom_left_command':
+				bottom_left_session = session
+			elif session.name == 'bottom_right_command':
+				bottom_right_session = session
+		# Validate BEGIN
+		assert main_command_session
+		assert bottom_left_session
+
+		if top_right_session and not bottom_right_session:
+			self.quit_telemetrise(msg='-t without -r is not allowed. Use -l or -r instead of -t')
+		# Validate DONE
+
 		window = self.window
 		# screen_arr in manager?
 		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
-		header_text = 'telemetrising ...' + str(self.wheight) + 'x' + str(self.wwidth)
+		header_text = 'telemetrising ...'
 		screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
-		# Gather sessions
-		bottom_left_session = None
-		bottom_right_session = None
-		main_command_session = None
-		for session in self.pexpect_sessions:
-			if session.name == 'bottom_left_command':
-				bottom_left_session = session
-			elif session.name == 'bottom_right_command':
-				bottom_right_session = session
-			elif session.name == 'main_command':
-				main_command_session = session
-		assert bottom_left_session
-		assert main_command_session
-		# Top half for command output
+
+		# Helper function to render subwindow
+		def render_subwindow(row_range_start, row_range_end, col_range_start, color):
+			for i, line in zip(reversed(range(row_range_start,row_range_end)), reversed(lines)):
+				screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
+
 		# Split the lines by newline, then reversed and zip up with line 2 to halfway.
+
+		# Top half
 		if main_command_session.output != '':
-			lines = main_command_session.get_lines(self.wwidth)
-			# TODO: abstract this
+			if top_right_session:
+				lines = main_command_session.get_lines(self.wwidth_left_end)
+			else:
+				lines = main_command_session.get_lines(self.wwidth)
+			# TODO: abstract this - needs range, lines, color, take position from self
 			for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [green(line)]
-		# Bottom left for strace output
+		if top_right_session:
+			if top_right_session.output != '':
+				lines = top_right_session.get_lines(self.wwidth_left_end)
+				# TODO: abstract this - see above
+				for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
+					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
+
+		# Bottom half
 		if bottom_left_session.output != '':
 			lines = bottom_left_session.get_lines(self.wwidth_left_end)
-			# TODO: abstract this
+			# TODO: abstract this - see above
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [red(line)]
 		if bottom_right_session:
-			# Bottom right for vmstat output
 			if bottom_right_session.output != '':
 				lines = bottom_right_session.get_lines(self.wwidth_left_end)
-				# TODO: abstract this
+				# TODO: abstract this - see above
 				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 		# Footer
@@ -121,7 +143,7 @@ class PexpectSessionManager(object):
 		with Input() as input_generator:
 			input_char = input_generator.send(.01)
 			if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
-				self.quit_telemetrise()
+				self.quit_telemetrise(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'p',):
 				self.status = 'Paused'
 				self.pause_sessions()
@@ -143,9 +165,16 @@ class PexpectSessionManager(object):
 	def setup_commands(self, args):
 		command = ' '.join(args.command)
 		this_platform = platform.system()
+		# Main command
 		main_session = PexpectSession(command, self,'main_command')
 		main_session.spawn()
-		main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
+		if args.top_right_command is None:
+			main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
+		else:
+			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
+			top_right_command = args.top_right_command.replace('PID',str(main_session.pid))
+			top_right_session = PexpectSession(top_right_command,self,'top_right_command')
+			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
 		if args.bottom_left_command is None:
 			# TODO: use password retrieved elsewhere and add command
@@ -295,6 +324,7 @@ def process_args():
 	parser.add_argument('command', metavar='COMMAND', type=str, nargs='+', help='Command to telemetrise')
 	parser.add_argument('-l','--bottom_left_command', default=None, help='Command to run in bottom left. Defaults to syscall tracer')
 	parser.add_argument('-r','--bottom_right_command', default=None, help='Command to run in bottom right. If not supplied, -l takes over bottom half.')
+	parser.add_argument('-t','--top_right_command', default=None, help='Command to run in top right. If not supplied, COMMAND takes over top half.')
 	return parser.parse_args()
 
 
@@ -324,7 +354,7 @@ def main():
 			pexpect_session_manager.handle_sessions()
 			pexpect_session_manager.handle_input()
 	except Exception as e:
-		pexpect_session_manager.quit_telemetrise()
+		pexpect_session_manager.quit_telemetrise(msg='Exception seen: ' + str(e))
 
 
 telemetrise_version='0.0.1'
