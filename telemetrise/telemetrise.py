@@ -16,6 +16,11 @@ from curtsies.input import Input
 # TODO: implement help
 # TODO: configurable log folder
 # TODO: revert screen at end
+# TODO: replay function?
+#       - add in timer to synchonise time
+#       - put elapsed time in before each line
+#       - replayer will 'just' read through the output files in the logs 
+#       - replayer should therefore take 'replay' and 'logfolder' as an argument
 
 class PexpectSessionManager(object):
 
@@ -203,6 +208,12 @@ class PexpectSessionManager(object):
 			elif input_char in (u'm',):
 				self.cycle_panes()
 				self.draw_screen()
+			elif input_char in (u'h',):
+				self.status = 'Help'
+				# Default is to pause sessions here - good idea?
+				self.pause_sessions()
+				self.draw_screen()
+				# TODO: redraw screen and show help
 			elif input_char:
 				self.write_to_logfile('input_char')
 				self.write_to_logfile(input_char)
