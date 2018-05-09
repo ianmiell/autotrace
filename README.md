@@ -6,7 +6,7 @@ process, all in one terminal window.
 Here's me seeing what nmap does by looking at strace and tcpdump, with the command:
 
 ```
-sudo telemetrise -c 'nmap meirionconsulting.com' -l 'strace -p PID' -r 'tcpdump -XXs 20000'
+sudo telemetrise 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 20000'
 ```
 
 ![Demo](https://raw.githubusercontent.com/ianmiell/telemetrise/master/demo.gif)
@@ -39,7 +39,7 @@ pip install telemetrise
 Mac example:
 
 ```
-$ sudo telemetrise -c 'find /' -l 'dtruss -f -p PID' -r 'iostat 1'
+$ sudo telemetrise 'find /' 'dtruss -f -p PID' 'iostat 1'
 ```
 
 PID is replaced with the PID of the main (-c) command
@@ -48,11 +48,11 @@ PID is replaced with the PID of the main (-c) command
 Linux example with strace and vmstat:
 
 ```
-$ sudo telemetrise -c 'find /' -l 'strace -p PID' -r 'vmstat 1'
+$ sudo telemetrise 'find /' 'strace -p PID' 'vmstat 1'
 ```
 
 Linux example with strace and tcpdump:
 
 ```
-$ sudo telemetrise -c 'nmap localhost' -l 'strace -p PID' -r 'tcpdump -XXs 20000'
+$ sudo telemetrise 'nmap localhost' 'strace -p PID' 'tcpdump -XXs 20000'
 ```

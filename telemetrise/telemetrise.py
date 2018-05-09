@@ -6,6 +6,7 @@ import os
 import sys
 import getpass
 import pexpect
+import time
 import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
@@ -46,12 +47,13 @@ class PexpectSessionManager(object):
 		self.wheight_bottom_start = int(self.wheight / 2) + 1
 		self.wwidth_left_end	  = int(self.wwidth / 2)
 		self.wwidth_right_start   = int(self.wwidth / 2) + 1
-		assert self.wheight >= 24
-		assert self.wwidth >= 80
+		self.start_time           = time.time()
+		assert self.wheight >= 24, self.quit_telemetrise('Terminal not tall enough!')
+		assert self.wwidth >= 80, self.quit_telemetrise('Terminal not wide enough!')
 
 
 	def write_to_logfile(self, msg):
-		self.logfile.write(str(msg) + '\n')
+		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
 
@@ -68,8 +70,8 @@ class PexpectSessionManager(object):
 			elif session.name == 'bottom_right_command':
 				bottom_right_session = session
 		# Validate BEGIN
-		assert main_command_session
-		assert bottom_left_session
+		assert main_command_session, self.quit_telemetrise('Main command session not found in draw_screen')
+		assert bottom_left_session, self.quit_telemetrise('Bottom left session not found in draw_screen')
 
 		if top_right_session and not bottom_right_session:
 			self.quit_telemetrise(msg='-t without -r is not allowed. Use -l or -r instead of -t')
@@ -96,12 +98,12 @@ class PexpectSessionManager(object):
 				lines = main_command_session.get_lines(self.wwidth_left_end)
 			else:
 				lines = main_command_session.get_lines(self.wwidth)
-			for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
+			for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [green(line)]
 		if top_right_session:
 			if top_right_session.output != '':
 				lines = top_right_session.get_lines(self.wwidth_left_end)
-				for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
+				for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
 					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
 		# Bottom half
@@ -167,38 +169,48 @@ class PexpectSessionManager(object):
 
 
 	def setup_commands(self, args):
-		command = ' '.join(args.command)
-		this_platform = platform.system()
+		num_commands = len(args.commands)
+		assert num_commands >= 2, self.quit_telemetrise('Not enough commands! Must be at least two.')
+		bottom_right_command = None
+		top_right_command = None
+		main_command = args.commands[0]
+		bottom_left_command = args.commands[1]
+		if num_commands >= 3:
+			bottom_right_command = args.commands[2]
+		if num_commands >= 4:
+			top_right_command = args.commands[3]
+		args = None
+
 		# Main command
-		main_session = PexpectSession(command, self,'main_command')
+		main_session = PexpectSession(main_command, self,'main_command')
 		main_session.spawn()
-		if args.top_right_command is None:
+		if top_right_command is None:
 			main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
 		else:
 			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
-			top_right_command = args.top_right_command.replace('PID',str(main_session.pid))
+			top_right_command = top_right_command.replace('PID',str(main_session.pid))
 			top_right_session = PexpectSession(top_right_command,self,'top_right_command')
 			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
-		if args.bottom_left_command is None:
+		if bottom_left_command is None:
 			# TODO: use password retrieved elsewhere and add command
 			#if self.root_ready:
 			#	sudo = ''
 			#else:
 			#	sudo = 'echo ' + password + ' | sudo -S -n echo && ')
 			sudo = ''
-			if this_platform == 'Darwin':
+			if platform.system() == 'Darwin':
 				bottom_left_command = sudo + 'dtruss -f -p ' + str(main_session.pid)
 			else:
 				bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
 		else:
-			bottom_left_command = args.bottom_left_command.replace('PID',str(main_session.pid))
+			bottom_left_command = bottom_left_command.replace('PID',str(main_session.pid))
 		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left_command')
-		if args.bottom_right_command is None:
+		if bottom_right_command is None:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		else:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
-			bottom_right_command = args.bottom_right_command.replace('PID',str(main_session.pid))
+			bottom_right_command = bottom_right_command.replace('PID',str(main_session.pid))
 			bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right_command')
 			bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		return
@@ -222,6 +234,10 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.name == 'main_command':
 				pexpect.run('kill -CONT ' + str(session.pid))
+
+
+	def get_elapsed_time_str(self):
+		return str(time.time() - self.start_time)
 
 
 
@@ -276,13 +292,13 @@ class PexpectSession(object):
 
 
 	def write_to_logfile(self, msg):
-		self.logfile.write(str(msg) + '\n')
+		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
 
 	def read_line(self,timeout=0.1):
-		assert self.top_left     != (-1,-1)
-		assert self.bottom_right != (-1,-1)
+		assert self.top_left     != (-1,-1), self.pexpect_session_manager.quit_telemetrise('top_left position unset')
+		assert self.bottom_right != (-1,-1), self.pexpect_session_manager.quit_telemetrise('bottom_right position unset')
 		if not self.pexpect_session:
 			return False
 		string = None
@@ -299,6 +315,7 @@ class PexpectSession(object):
 			self.pexpect_session_manager.write_to_logfile('Error in command session: ' + self.command)
 			self.pexpect_session_manager.write_to_logfile(e)
 		if string:
+			self.write_to_logfile(string.strip())
 			self.output += string
 			return True
 		return False
@@ -325,10 +342,7 @@ class PexpectSession(object):
 
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
-	parser.add_argument('command', metavar='COMMAND', type=str, nargs='+', help='Command to telemetrise')
-	parser.add_argument('-l','--bottom_left_command', default=None, help='Command to run in bottom left. Defaults to syscall tracer')
-	parser.add_argument('-r','--bottom_right_command', default=None, help='Command to run in bottom right. If not supplied, -l takes over bottom half.')
-	parser.add_argument('-t','--top_right_command', default=None, help='Command to run in top right. If not supplied, COMMAND takes over top half.')
+	parser.add_argument('commands', type=str, nargs='+', help='''Commands to telemetrise, separated by spaces, eg "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
 	return parser.parse_args()
 
 
@@ -351,7 +365,7 @@ def main():
 				main_command_session = session
 			else:
 				session.spawn()
-		assert main_command_session
+		assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
 		pexpect.run('kill -CONT ' + str(main_command_session.pid))
 		while True:
 			pexpect_session_manager.draw_screen()
