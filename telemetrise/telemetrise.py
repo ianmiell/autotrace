@@ -45,6 +45,7 @@ class PexpectSessionManager(object):
 			self.root_ready = True
 		# Setup
 		self.window               = curtsies.FullscreenWindow()
+		self.screen_arr           = None
 		self.wheight              = self.window.height
 		self.wwidth               = self.window.width
 		# Divide the screen up into two, to keep it simple for now
@@ -98,7 +99,37 @@ class PexpectSessionManager(object):
 					session.name = str(session_number - 1)
 
 
-	def draw_screen(self):
+	def draw_screen(self, draw_type):
+		assert draw_type in ('sessions','help')
+		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
+		# Header
+		header_text = 'telemetrise running...'
+		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
+		# Footer
+		quick_help = 'ESC/q to quit, p to pause, c to continue, m to cycle windows, h for help'
+		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
+		footer_text = self.status + space + quick_help
+		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
+
+		if draw_type == 'sessions':
+			self.draw_sessions(self.screen_arr)
+		elif draw_type == 'help':
+			self.draw_help(self.screen_arr)
+
+		# We're done, now render.
+		self.window.render_to_terminal(self.screen_arr)
+
+
+	def draw_help(self, screen_arr):
+		help_text_lines = ['Placeholder text',]
+		i=2
+		for line in help_text_lines:
+			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
+			i += 1
+		
+
+
+	def draw_sessions(self, screen_arr):
 		# Gather sessions
 		main_command_session, top_right_session, bottom_left_session, bottom_right_session = (None,)*4
 		for session in self.pexpect_sessions:
@@ -118,18 +149,12 @@ class PexpectSessionManager(object):
 			self.quit_telemetrise(msg='-t without -r is not allowed. Use -l or -r instead of -t')
 		# Validate DONE
 
-		window = self.window
-		# screen_arr in manager?
-		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
-		# Header
-		header_text = 'telemetrising ...'
-		screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 
 		# Helper function to render subwindow - BUGGY?
 		# Test with: python telemetrise/telemetrise.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
 		def render_subwindow(lines, row_range_start, row_range_end, col_range_start, color):
 			for i, line in zip(reversed(range(row_range_start,row_range_end)), reversed(lines)):
-				screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
+				self.screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
 
 		# Split the lines by newline, then reversed and zip up with line 2 to halfway.
 
@@ -140,35 +165,28 @@ class PexpectSessionManager(object):
 			else:
 				lines = main_command_session.get_lines(self.wwidth)
 			for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
-				screen_arr[i:i+1, 0:len(line)] = [green(line)]
+				self.screen_arr[i:i+1, 0:len(line)] = [green(line)]
 		if top_right_session:
 			if top_right_session.output != '':
 				lines = top_right_session.get_lines(self.wwidth_left_end)
 				for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
-					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
+					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
 		# Bottom half
 		if bottom_left_session.output != '':
 			lines = bottom_left_session.get_lines(self.wwidth_left_end)
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
-				screen_arr[i:i+1, 0:len(line)] = [red(line)]
+				self.screen_arr[i:i+1, 0:len(line)] = [red(line)]
 		if bottom_right_session:
 			if bottom_right_session.output != '':
 				lines = bottom_right_session.get_lines(self.wwidth_left_end)
 				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
-					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
-		# Footer
-		quick_help = 'ESC/q to quit, p to pause, c to continue, m to cycle windows, h for help'
-		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
-		footer_text = self.status + space + quick_help
-		screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
-		# We're done, now render.
-		window.render_to_terminal(screen_arr)
+					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
 
 	def quit_telemetrise(self, msg='All done.'):
-		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
-		self.window.render_to_terminal(screen_arr)
+		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
+		self.window.render_to_terminal(self.screen_arr)
 		# leave useful message
 		msg += '\nLogs and output in: ' + self.tmpdir
 		msg += '\nCommands were: '
@@ -194,12 +212,12 @@ class PexpectSessionManager(object):
 			elif input_char in (u'p',):
 				self.status = 'Paused'
 				self.pause_sessions()
-				self.draw_screen()
+				self.draw_screen('sessions')
 				for e in input_generator:
 					if e == 'c':
 						self.unpause_sessions()
 						self.status = 'Running'
-						self.draw_screen()
+						self.draw_screen('sessions')
 						break
 					elif e == 'q':
 						self.quit_telemetrise()
@@ -207,12 +225,20 @@ class PexpectSessionManager(object):
 				self.quit_telemetrise()
 			elif input_char in (u'm',):
 				self.cycle_panes()
-				self.draw_screen()
+				self.draw_screen('sessions')
 			elif input_char in (u'h',):
 				self.status = 'Help'
 				# Default is to pause sessions here - good idea?
 				self.pause_sessions()
-				self.draw_screen()
+				self.draw_screen('help')
+				for e in input_generator:
+					if e == 'c':
+						self.unpause_sessions()
+						self.status = 'Running'
+						self.draw_screen('sessions')
+						break
+					elif e == 'q':
+						self.quit_telemetrise()
 				# TODO: redraw screen and show help
 			elif input_char:
 				self.write_to_logfile('input_char')
@@ -227,11 +253,14 @@ class PexpectSessionManager(object):
 		top_right_command    = None
 
 		main_command         = args.commands[0]
-		bottom_left_command  = args.commands[1]
-		if num_commands >= 3:
+		if num_commands > 1:
+			bottom_left_command  = args.commands[1]
+		else:
+			bottom_left_command  = None
+		if num_commands > 2:
 			bottom_right_command = args.commands[2]
-		if num_commands >= 4:
-			top_right_command = args.commands[3]
+		if num_commands > 3:
+			top_right_command    = args.commands[3]
 		remaining_commands = args.commands[3:]
 		args = None
 
@@ -427,7 +456,7 @@ def main():
 	assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
 	pexpect.run('kill -CONT ' + str(main_command_session.pid))
 	while True:
-		pexpect_session_manager.draw_screen()
+		pexpect_session_manager.draw_screen('sessions')
 		pexpect_session_manager.handle_sessions()
 		pexpect_session_manager.handle_input()
 	#except Exception as e:
