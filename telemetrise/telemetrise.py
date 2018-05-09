@@ -79,8 +79,9 @@ class PexpectSessionManager(object):
 		header_text = 'telemetrising ...'
 		screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 
-		# Helper function to render subwindow
-		def render_subwindow(row_range_start, row_range_end, col_range_start, color):
+		# Helper function to render subwindow - BUGGY?
+		# Test with: python telemetrise/telemetrise.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
+		def render_subwindow(lines, row_range_start, row_range_end, col_range_start, color):
 			for i, line in zip(reversed(range(row_range_start,row_range_end)), reversed(lines)):
 				screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
 
@@ -92,26 +93,22 @@ class PexpectSessionManager(object):
 				lines = main_command_session.get_lines(self.wwidth_left_end)
 			else:
 				lines = main_command_session.get_lines(self.wwidth)
-			# TODO: abstract this - needs range, lines, color, take position from self
 			for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [green(line)]
 		if top_right_session:
 			if top_right_session.output != '':
 				lines = top_right_session.get_lines(self.wwidth_left_end)
-				# TODO: abstract this - see above
 				for i, line in zip(reversed(range(2,self.wheight_top_end)), reversed(lines)):
 					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
 		# Bottom half
 		if bottom_left_session.output != '':
 			lines = bottom_left_session.get_lines(self.wwidth_left_end)
-			# TODO: abstract this - see above
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [red(line)]
 		if bottom_right_session:
 			if bottom_right_session.output != '':
 				lines = bottom_right_session.get_lines(self.wwidth_left_end)
-				# TODO: abstract this - see above
 				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 		# Footer
