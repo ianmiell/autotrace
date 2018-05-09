@@ -5,17 +5,17 @@ import platform
 import os
 import sys
 import getpass
-import pexpect
+import logging
 import time
+import pexpect
 import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
 # TODO: move cursor from top left
-# TODO: allow arbitrary numbers of commands and give option of cycling through them
 # TODO: implement help
-# TODO: revert screen at end
 # TODO: configurable log folder
+# TODO: revert screen at end
 
 class PexpectSessionManager(object):
 
@@ -57,17 +57,53 @@ class PexpectSessionManager(object):
 		self.logfile.flush()
 
 
+	def cycle_panes(self):
+		# Must have more than 4 panes to do a cycle (including main command)
+		num_sessions = len(self.pexpect_sessions)
+		if num_sessions <= 4:
+			return False
+		# eg we have bottom_left, bottom_right, top_right, 1, 2
+		# cycling:
+		#   bottom_left => 2
+		#   2 => 1
+		#   1 => top_right
+		#   top_right => bottom_right
+		#   bottom_right => bottom_left
+		max_session_number = 0
+		for session in self.pexpect_sessions:
+			if session.name not in ('top_right','bottom_right','bottom_left','main_command') and max_session_number < int(session.name):
+				max_session_number = int(session.name)
+		assert max_session_number > 0
+		for session in self.pexpect_sessions:
+			if session.name == 'top_right':
+				session.name = 'bottom_right'
+			elif session.name == 'bottom_right':
+				session.name = 'bottom_left'
+			elif session.name == 'bottom_left':
+				session.name = str(max_session_number)
+			elif session.name == 'main_command':
+				# Do nothing - this does not get touched
+				pass
+			else:
+				assert isinstance(int(session.name), int), 'Broken session name: ' + session.name
+				session_number = int(session.name)
+				if session_number == 1:
+					session.name = 'top_right'
+				else:
+					session.name = str(session_number - 1)
+
+
 	def draw_screen(self):
 		# Gather sessions
-		main_command_session, top_right_session, bottom_left_command, bottom_right_session = (None,)*4
+		main_command_session, top_right_session, bottom_left_session, bottom_right_session = (None,)*4
 		for session in self.pexpect_sessions:
 			if session.name == 'main_command':
 				main_command_session = session
-			elif session.name == 'top_right_command':
+			elif session.name == 'top_right':
 				top_right_session = session
-			elif session.name == 'bottom_left_command':
+			elif session.name == 'bottom_left':
 				bottom_left_session = session
-			elif session.name == 'bottom_right_command':
+			elif session.name == 'bottom_right':
 				bottom_right_session = session
 		# Validate BEGIN
 		assert main_command_session, self.quit_telemetrise('Main command session not found in draw_screen')
@@ -117,7 +153,7 @@ class PexpectSessionManager(object):
 				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 		# Footer
-		quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
+		quick_help = 'ESC/q to quit, p to pause, c to continue, m to cycle windows, h for help'
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
 		footer_text = self.status + space + quick_help
 		screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
@@ -154,15 +190,19 @@ class PexpectSessionManager(object):
 				self.status = 'Paused'
 				self.pause_sessions()
 				self.draw_screen()
-				input_char = input_generator
 				for e in input_generator:
 					if e == 'c':
 						self.unpause_sessions()
 						self.status = 'Running'
 						self.draw_screen()
 						break
-					if e == 'q':
-						quit()
+					elif e == 'q':
+						self.quit_telemetrise()
+			elif input_char == 'q':
+				self.quit_telemetrise()
+			elif input_char in (u'm',):
+				self.cycle_panes()
+				self.draw_screen()
 			elif input_char:
 				self.write_to_logfile('input_char')
 				self.write_to_logfile(input_char)
@@ -170,15 +210,18 @@ class PexpectSessionManager(object):
 
 	def setup_commands(self, args):
 		num_commands = len(args.commands)
-		assert num_commands >= 2, self.quit_telemetrise('Not enough commands! Must be at least two.')
+		assert num_commands >= 1, self.quit_telemetrise('Not enough commands! Must be at least two.')
+		bottom_left_command  = None
 		bottom_right_command = None
-		top_right_command = None
-		main_command = args.commands[0]
-		bottom_left_command = args.commands[1]
+		top_right_command    = None
+
+		main_command         = args.commands[0]
+		bottom_left_command  = args.commands[1]
 		if num_commands >= 3:
 			bottom_right_command = args.commands[2]
 		if num_commands >= 4:
 			top_right_command = args.commands[3]
+		remaining_commands = args.commands[3:]
 		args = None
 
 		# Main command
@@ -189,7 +232,7 @@ class PexpectSessionManager(object):
 		else:
 			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
 			top_right_command = top_right_command.replace('PID',str(main_session.pid))
-			top_right_session = PexpectSession(top_right_command,self,'top_right_command')
+			top_right_session = PexpectSession(top_right_command,self,'top_right')
 			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
 		if bottom_left_command is None:
@@ -205,14 +248,21 @@ class PexpectSessionManager(object):
 				bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			bottom_left_command = bottom_left_command.replace('PID',str(main_session.pid))
-		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left_command')
+		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left')
 		if bottom_right_command is None:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		else:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
 			bottom_right_command = bottom_right_command.replace('PID',str(main_session.pid))
-			bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right_command')
+			bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right')
 			bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+
+		# Set up any other sessions to be set up.
+		count = 0
+		for other_command in remaining_commands:
+			other_session = PexpectSession(other_command, self, str(count))
+			other_session.set_position(0,0,0,0)
+			count += 1
 		return
 
 
@@ -311,9 +361,9 @@ class PexpectSession(object):
 		except pexpect.TIMEOUT:
 			# This is ok.
 			self.pexpect_session_manager.write_to_logfile('Timeout in command session: ' + self.command)
-		except Exception as e:
+		except Exception as eg:
 			self.pexpect_session_manager.write_to_logfile('Error in command session: ' + self.command)
-			self.pexpect_session_manager.write_to_logfile(e)
+			self.pexpect_session_manager.write_to_logfile(eg)
 		if string:
 			self.write_to_logfile(string.strip())
 			self.output += string
@@ -338,8 +388,6 @@ class PexpectSession(object):
 		return self.output.split('\r\n')
 
 
-
-
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
 	parser.add_argument('commands', type=str, nargs='+', help='''Commands to telemetrise, separated by spaces, eg "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
@@ -357,22 +405,22 @@ def make_root_ready():
 def main():
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager()
-	try:
-		pexpect_session_manager.setup_commands(args)
-		main_command_session = None
-		for session in pexpect_session_manager.pexpect_sessions:
-			if session.name == 'main_command':
-				main_command_session = session
-			else:
-				session.spawn()
-		assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
-		pexpect.run('kill -CONT ' + str(main_command_session.pid))
-		while True:
-			pexpect_session_manager.draw_screen()
-			pexpect_session_manager.handle_sessions()
-			pexpect_session_manager.handle_input()
-	except Exception as e:
-		pexpect_session_manager.quit_telemetrise(msg='Exception seen: ' + str(e))
+	#try:
+	pexpect_session_manager.setup_commands(args)
+	main_command_session = None
+	for session in pexpect_session_manager.pexpect_sessions:
+		if session.name == 'main_command':
+			main_command_session = session
+		else:
+			session.spawn()
+	assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
+	pexpect.run('kill -CONT ' + str(main_command_session.pid))
+	while True:
+		pexpect_session_manager.draw_screen()
+		pexpect_session_manager.handle_sessions()
+		pexpect_session_manager.handle_input()
+	#except Exception as e:
+	#	pexpect_session_manager.quit_telemetrise(msg='Exception seen: ' + str(e) + '\n' + str(logging.error(e)))
 
 
 telemetrise_version='0.0.1'
