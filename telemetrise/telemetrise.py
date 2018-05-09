@@ -52,7 +52,7 @@ class PexpectSessionManager(object):
 		self.logfile.flush()
 
 
-	def build_page(self):
+	def draw_screen(self):
 		window = self.window
 		# screen_arr in manager?
 		screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
@@ -70,7 +70,6 @@ class PexpectSessionManager(object):
 				bottom_right_session = session
 			elif session.name == 'main_command':
 				main_command_session = session
-		assert bottom_right_session
 		assert bottom_left_session
 		assert main_command_session
 		# Top half for command output
@@ -86,12 +85,13 @@ class PexpectSessionManager(object):
 			# TODO: abstract this
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 				screen_arr[i:i+1, 0:len(line)] = [red(line)]
-		# Bottom right for vmstat output
-		if bottom_right_session.output != '':
-			lines = bottom_right_session.get_lines(self.wwidth_left_end)
-			# TODO: abstract this
-			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
-				screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
+		if bottom_right_session:
+			# Bottom right for vmstat output
+			if bottom_right_session.output != '':
+				lines = bottom_right_session.get_lines(self.wwidth_left_end)
+				# TODO: abstract this
+				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
+					screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 		# Footer
 		quick_help = 'ESC/q to quit, p to pause, c to continue, h for help'
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
@@ -125,13 +125,13 @@ class PexpectSessionManager(object):
 			elif input_char in (u'p',):
 				self.status = 'Paused'
 				self.pause_sessions()
-				self.build_page()
+				self.draw_screen()
 				input_char = input_generator
 				for e in input_generator:
 					if e == 'c':
 						self.unpause_sessions()
 						self.status = 'Running'
-						self.build_page()
+						self.draw_screen()
 						break
 					if e == 'q':
 						quit()
@@ -141,8 +141,9 @@ class PexpectSessionManager(object):
 
 
 	def setup_commands(self, args):
+		command = ' '.join(args.command)
 		this_platform = platform.system()
-		main_session = PexpectSession(args.command, self,'main_command')
+		main_session = PexpectSession(command, self,'main_command')
 		main_session.spawn()
 		main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
@@ -160,17 +161,13 @@ class PexpectSessionManager(object):
 		else:
 			bottom_left_command = args.bottom_left_command.replace('PID',str(main_session.pid))
 		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left_command')
-		bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
-		# Default for bottom right is vmstat
 		if args.bottom_right_command is None:
-			if this_platform == 'Darwin':
-				bottom_right_command = 'iostat 1 '
-			else:
-				bottom_right_command = 'vmstat 1 '
+			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		else:
+			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
 			bottom_right_command = args.bottom_right_command.replace('PID',str(main_session.pid))
-		bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right_command')
-		bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+			bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right_command')
+			bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		return
 
 
@@ -295,9 +292,9 @@ class PexpectSession(object):
 
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
-	parser.add_argument('-c','--command', default='ping -c10 google.com')
-	parser.add_argument('-l','--bottom_left_command', default=None)
-	parser.add_argument('-r','--bottom_right_command', default=None)
+	parser.add_argument('command', metavar='COMMAND', type=str, nargs='+', help='Command to telemetrise')
+	parser.add_argument('-l','--bottom_left_command', default=None, help='Command to run in bottom left. Defaults to syscall tracer')
+	parser.add_argument('-r','--bottom_right_command', default=None, help='Command to run in bottom right. If not supplied, -l takes over bottom half.')
 	return parser.parse_args()
 
 
@@ -323,7 +320,7 @@ def main():
 		assert main_command_session
 		pexpect.run('kill -CONT ' + str(main_command_session.pid))
 		while True:
-			pexpect_session_manager.build_page()
+			pexpect_session_manager.draw_screen()
 			pexpect_session_manager.handle_sessions()
 			pexpect_session_manager.handle_input()
 	except Exception as e:
