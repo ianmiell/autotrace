@@ -12,10 +12,7 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
-# TODO: move cursor from top left
 # TODO: implement help
-# TODO: configurable log folder
-# TODO: revert screen at end
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -26,7 +23,7 @@ class PexpectSessionManager(object):
 
 	only_one = None
 
-	def __init__(self):
+	def __init__(self, logdir=None):
 		# Singleton
 		assert self.only_one is None
 		self.only_one             = True
@@ -34,9 +31,13 @@ class PexpectSessionManager(object):
 		self.status               = 'Running'
 		self.main_command_session = None
 		self.pid                  = os.getpid()
-		self.tmpdir               = '/tmp/tmp_telemetrise/' + str(self.pid)
-		os.system('mkdir -p ' + self.tmpdir)
-		self.logfilename          = '/tmp/tmp_telemetrise/' + str(self.pid) + '/manager'
+		if logdir is not None:
+			assert isinstance(logdir, str)
+			self.logdir               = logdir
+		else:
+			self.logdir               = '/tmp/tmp_telemetrise/' + str(self.pid)
+		os.system('mkdir -p ' + self.logdir)
+		self.logfilename          = self.logdir + '/manager.telemetrise.' + str(self.pid) + '.log'
 		self.logfile              = open(self.logfilename,'w+')
 		os.chmod(self.logfilename,0o777)
 		# Does user have root?
@@ -44,6 +45,11 @@ class PexpectSessionManager(object):
 		if os.getuid() == 0:
 			self.root_ready = True
 		# Setup
+		self.refresh_window()
+		self.start_time           = time.time()
+
+
+	def refresh_window(self):
 		self.window               = curtsies.FullscreenWindow()
 		self.screen_arr           = None
 		self.wheight              = self.window.height
@@ -53,7 +59,6 @@ class PexpectSessionManager(object):
 		self.wheight_bottom_start = int(self.wheight / 2) + 1
 		self.wwidth_left_end	  = int(self.wwidth / 2)
 		self.wwidth_right_start   = int(self.wwidth / 2) + 1
-		self.start_time           = time.time()
 		assert self.wheight >= 24, self.quit_telemetrise('Terminal not tall enough!')
 		assert self.wwidth >= 80, self.quit_telemetrise('Terminal not wide enough!')
 
@@ -106,7 +111,7 @@ class PexpectSessionManager(object):
 		header_text = 'telemetrise running...'
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
-		quick_help = 'ESC/q to quit, p to pause, c to continue, m to cycle windows, h for help'
+		quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
 		footer_text = self.status + space + quick_help
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
@@ -117,7 +122,7 @@ class PexpectSessionManager(object):
 			self.draw_help(self.screen_arr)
 
 		# We're done, now render.
-		self.window.render_to_terminal(self.screen_arr)
+		self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
 
 	def draw_help(self, screen_arr):
@@ -188,7 +193,7 @@ class PexpectSessionManager(object):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
 		# leave useful message
-		msg += '\nLogs and output in: ' + self.tmpdir
+		msg += '\nLogs and output in: ' + self.logdir
 		msg += '\nCommands were: '
 		for session in self.pexpect_sessions:
 			msg += '\n\t' + session.command
@@ -345,7 +350,7 @@ class PexpectSession(object):
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
-		self.logfilename             = pexpect_session_manager.tmpdir + '/' + name + '.output'
+		self.logfilename             = pexpect_session_manager.logdir + '/' + name + '.telemetrise.' + str(pexpect_session_manager.pid) + '.log'
 		self.logfile                 = open(self.logfilename,'w+')
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
@@ -430,7 +435,8 @@ class PexpectSession(object):
 
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
-	parser.add_argument('commands', type=str, nargs='+', help='''Commands to telemetrise, separated by spaces, eg "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
+	parser.add_argument('commands', type=str, nargs='+', help='''Commands to telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
+	parser.add_argument('-l', default=None, help=''' telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
 	return parser.parse_args()
 
 
@@ -444,8 +450,7 @@ def make_root_ready():
 
 def main():
 	args = process_args()
-	pexpect_session_manager=PexpectSessionManager()
-	#try:
+	pexpect_session_manager=PexpectSessionManager(args.l)
 	pexpect_session_manager.setup_commands(args)
 	main_command_session = None
 	for session in pexpect_session_manager.pexpect_sessions:
@@ -456,11 +461,13 @@ def main():
 	assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
 	pexpect.run('kill -CONT ' + str(main_command_session.pid))
 	while True:
-		pexpect_session_manager.draw_screen('sessions')
-		pexpect_session_manager.handle_sessions()
-		pexpect_session_manager.handle_input()
-	#except Exception as e:
-	#	pexpect_session_manager.quit_telemetrise(msg='Exception seen: ' + str(e) + '\n' + str(logging.error(e)))
+		try:
+			while True:
+				pexpect_session_manager.draw_screen('sessions')
+				pexpect_session_manager.handle_sessions()
+				pexpect_session_manager.handle_input()
+		except KeyboardInterrupt:
+			pexpect_session_manager.refresh_window()
 
 
 telemetrise_version='0.0.1'
