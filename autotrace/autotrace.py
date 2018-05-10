@@ -20,7 +20,7 @@ from curtsies.input import Input
 #       - replayer will 'just' read through the output files in the logs 
 #       - replayer should therefore take 'replay' and 'logfolder' as an argument
 #       - it will work by, for each logfile:
-#         - start a telemetrise process (because we know telemetrise will be installed) that:
+#         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
 
@@ -41,10 +41,10 @@ class PexpectSessionManager(object):
 			self.logdir               = logdir
 			os.system('mkdir -p ' + self.logdir)
 		else:
-			self.logdir               = '/tmp/tmp_telemetrise/' + str(self.pid)
+			self.logdir               = '/tmp/tmp_autotrace/' + str(self.pid)
 			os.system('mkdir -p ' + self.logdir)
-			os.system('chmod -R 777 /tmp/tmp_telemetrise')
-		self.logfilename          = self.logdir + '/manager.telemetrise.' + str(self.pid) + '.log'
+			os.system('chmod -R 777 /tmp/tmp_autotrace')
+		self.logfilename          = self.logdir + '/manager.autotrace.' + str(self.pid) + '.log'
 		self.logfile              = open(self.logfilename,'w+')
 		os.chmod(self.logfilename,0o777)
 		# Does user have root?
@@ -67,8 +67,8 @@ class PexpectSessionManager(object):
 		self.wheight_bottom_start = int(self.wheight / 2) + 1
 		self.wwidth_left_end	  = int(self.wwidth / 2)
 		self.wwidth_right_start   = int(self.wwidth / 2) + 1
-		assert self.wheight >= 24, self.quit_telemetrise('Terminal not tall enough!')
-		assert self.wwidth >= 80, self.quit_telemetrise('Terminal not wide enough!')
+		assert self.wheight >= 24, self.quit_autotrace('Terminal not tall enough!')
+		assert self.wwidth >= 80, self.quit_autotrace('Terminal not wide enough!')
 
 
 	def write_to_logfile(self, msg):
@@ -125,7 +125,7 @@ class PexpectSessionManager(object):
 		assert draw_type in ('sessions','help')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
-		header_text = 'telemetrise running...'
+		header_text = 'autotrace running...'
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
 		_, number_of_sessions = self.get_number_of_sessions()
@@ -168,16 +168,16 @@ class PexpectSessionManager(object):
 			elif session.name == 'bottom_right':
 				bottom_right_session = session
 		# Validate BEGIN
-		assert main_command_session, self.quit_telemetrise('Main command session not found in draw_screen')
-		assert bottom_left_session, self.quit_telemetrise('Bottom left session not found in draw_screen')
+		assert main_command_session, self.quit_autotrace('Main command session not found in draw_screen')
+		assert bottom_left_session, self.quit_autotrace('Bottom left session not found in draw_screen')
 
 		if top_right_session and not bottom_right_session:
-			self.quit_telemetrise(msg='-t without -r is not allowed. Use -l or -r instead of -t')
+			self.quit_autotrace(msg='-t without -r is not allowed. Use -l or -r instead of -t')
 		# Validate DONE
 
 
 		# Helper function to render subwindow - BUGGY?
-		# Test with: python telemetrise/telemetrise.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
+		# Test with: python autotrace/autotrace.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
 		def render_subwindow(lines, row_range_start, row_range_end, col_range_start, color):
 			for i, line in zip(reversed(range(row_range_start,row_range_end)), reversed(lines)):
 				self.screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
@@ -210,7 +210,7 @@ class PexpectSessionManager(object):
 					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
 
-	def quit_telemetrise(self, msg='All done.'):
+	def quit_autotrace(self, msg='All done.'):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
 		# leave useful message
@@ -234,7 +234,7 @@ class PexpectSessionManager(object):
 		with Input() as input_generator:
 			input_char = input_generator.send(.01)
 			if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
-				self.quit_telemetrise(msg=input_char + ' hit, quitting.')
+				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'p',):
 				self.status = 'Paused'
 				self.pause_sessions()
@@ -246,9 +246,9 @@ class PexpectSessionManager(object):
 						self.draw_screen('sessions')
 						break
 					elif e == 'q':
-						self.quit_telemetrise()
+						self.quit_autotrace()
 			elif input_char == 'q':
-				self.quit_telemetrise()
+				self.quit_autotrace()
 			elif input_char in (u'm',):
 				self.cycle_panes()
 				self.draw_screen('sessions')
@@ -264,7 +264,7 @@ class PexpectSessionManager(object):
 						self.draw_screen('sessions')
 						break
 					elif e == 'q':
-						self.quit_telemetrise()
+						self.quit_autotrace()
 				# TODO: redraw screen and show help
 			elif input_char:
 				self.write_to_logfile('input_char')
@@ -273,7 +273,7 @@ class PexpectSessionManager(object):
 
 	def setup_commands(self, args):
 		num_commands = len(args.commands)
-		assert num_commands >= 1, self.quit_telemetrise('Not enough commands! Must be at least two.')
+		assert num_commands >= 1, self.quit_autotrace('Not enough commands! Must be at least two.')
 		bottom_left_command  = None
 		bottom_right_command = None
 		top_right_command    = None
@@ -368,7 +368,7 @@ class PexpectSession(object):
 		self.pexpect_session_manager = pexpect_session_manager
 		self.top_left                = (-1,-1)
 		self.bottom_right            = (-1,-1)
-		self.logfilename             = pexpect_session_manager.logdir + '/' + name + '.telemetrise.' + str(pexpect_session_manager.pid) + '.log'
+		self.logfilename             = pexpect_session_manager.logdir + '/' + name + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
 		self.logfile                 = open(self.logfilename,'w+')
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
@@ -404,8 +404,8 @@ class PexpectSession(object):
 
 
 	def read_line(self,timeout=0.1):
-		assert self.top_left     != (-1,-1), self.pexpect_session_manager.quit_telemetrise('top_left position unset')
-		assert self.bottom_right != (-1,-1), self.pexpect_session_manager.quit_telemetrise('bottom_right position unset')
+		assert self.top_left     != (-1,-1), self.pexpect_session_manager.quit_autotrace('top_left position unset')
+		assert self.bottom_right != (-1,-1), self.pexpect_session_manager.quit_autotrace('bottom_right position unset')
 		if not self.pexpect_session:
 			return False
 		string = None
@@ -447,8 +447,9 @@ class PexpectSession(object):
 
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
-	parser.add_argument('commands', type=str, nargs='?', help='''Commands to telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
+	parser.add_argument('commands', type=str, nargs='?', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
+	parser.add_argument('-v', default=None, help='Split vertically rather than horizontally.')
 	parser.add_argument('--replayfile', help='Replay output of an individual file')
 	args = parser.parse_args()
 	# Validate BEGIN
@@ -473,7 +474,7 @@ def main():
 				main_command_session = session
 			else:
 				session.spawn()
-		assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
+		assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
 		pexpect.run('kill -CONT ' + str(main_command_session.pid))
 		while True:
 			try:
@@ -488,7 +489,7 @@ def main():
 		assert False
 
 
-telemetrise_version='0.0.8'
+autotrace_version='0.0.8'
 
 if __name__ == '__main__':
 	main()
