@@ -34,9 +34,11 @@ class PexpectSessionManager(object):
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
+			os.system('mkdir -p ' + self.logdir)
 		else:
 			self.logdir               = '/tmp/tmp_telemetrise/' + str(self.pid)
-		os.system('mkdir -p ' + self.logdir)
+			os.system('mkdir -p ' + self.logdir)
+			os.system('chmod -R 777 /tmp/tmp_telemetrise')
 		self.logfilename          = self.logdir + '/manager.telemetrise.' + str(self.pid) + '.log'
 		self.logfile              = open(self.logfilename,'w+')
 		os.chmod(self.logfilename,0o777)
@@ -80,7 +82,7 @@ class PexpectSessionManager(object):
 		#   1 => top_right
 		#   top_right => bottom_right
 		#   bottom_right => bottom_left
-		max_session_number = 0
+		max_session_number, _ = self.get_number_of_sessions()
 		for session in self.pexpect_sessions:
 			if session.name not in ('top_right','bottom_right','bottom_left','main_command') and max_session_number < int(session.name):
 				max_session_number = int(session.name)
@@ -104,6 +106,15 @@ class PexpectSessionManager(object):
 					session.name = str(session_number - 1)
 
 
+	def get_number_of_sessions(self):
+		max_session_number = 0
+		reserved_list = ('top_right','bottom_right','bottom_left','main_command')
+		for session in self.pexpect_sessions:
+			if session.name not in reserved_list and max_session_number < int(session.name):
+				max_session_number = int(session.name)
+		return max_session_number, max_session_number + len(reserved_list)
+
+
 	def draw_screen(self, draw_type):
 		assert draw_type in ('sessions','help')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
@@ -111,7 +122,11 @@ class PexpectSessionManager(object):
 		header_text = 'telemetrise running...'
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
-		quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
+		_, number_of_sessions = self.get_number_of_sessions()
+		if number_of_sessions > 0:
+			quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
+		else:
+			quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
 		footer_text = self.status + space + quick_help
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
@@ -276,7 +291,7 @@ class PexpectSessionManager(object):
 			main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
 		else:
 			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
-			top_right_command = top_right_command.replace('PID',str(main_session.pid))
+			top_right_command = self.replace_pid(top_right_command, str(main_session.pid))
 			top_right_session = PexpectSession(top_right_command,self,'top_right')
 			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
@@ -292,23 +307,28 @@ class PexpectSessionManager(object):
 			else:
 				bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
 		else:
-			bottom_left_command = bottom_left_command.replace('PID',str(main_session.pid))
+			bottom_left_command = self.replace_pid(bottom_left_command, str(main_session.pid))
 		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left')
 		if bottom_right_command is None:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		else:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
-			bottom_right_command = bottom_right_command.replace('PID',str(main_session.pid))
+			bottom_right_command = self.replace_pid(bottom_right_command, str(main_session.pid))
 			bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right')
 			bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 
 		# Set up any other sessions to be set up.
 		count = 0
 		for other_command in remaining_commands:
+			other_command = self.replace_pid(other_command, str(main_session.pid))
 			other_session = PexpectSession(other_command, self, str(count))
 			other_session.set_position(0,0,0,0)
 			count += 1
-		return
+
+
+	def replace_pid(self, string, pid_str):
+		assert isinstance(pid_str, str)
+		return string.replace('PID', pid_str)
 
 
 	def pause_sessions(self):
@@ -470,7 +490,7 @@ def main():
 			pexpect_session_manager.refresh_window()
 
 
-telemetrise_version='0.0.7'
+telemetrise_version='0.0.8'
 
 if __name__ == '__main__':
 	main()

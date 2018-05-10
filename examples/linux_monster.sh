@@ -1,0 +1,2 @@
+#!/bin/bash
+sudo telemetrise 'nmap localhost' 'strace -p PID' 'tcpdump -XXs 20000' 'bash -c "while true; do free; sleep 5; done"' 'bash -c "while true; do lsof -p PID | tail -5; sleep 5; done"' 'bash -c "while true; do pstree -p PID | tail -5; sleep 5; done"' 'bash -c "while true; do cat /proc/interrupts; sleep 1; done"'
