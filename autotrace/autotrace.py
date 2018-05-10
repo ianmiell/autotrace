@@ -291,7 +291,7 @@ class PexpectSessionManager(object):
 		args = None
 
 		# Main command
-		main_session = PexpectSession(main_command, self,'main_command')
+		main_session = PexpectSession(main_command, self,0)
 		main_session.spawn()
 		if top_right_command is None:
 			main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
@@ -366,12 +366,14 @@ class PexpectSession(object):
 		self.pid                     = -1
 		self.encoding                = encoding
 		self.pexpect_session_manager = pexpect_session_manager
-		self.logfilename             = pexpect_session_manager.logdir + '/' + name + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
+		self.logfilename             = pexpect_session_manager.logdir + '/' + str(self.session_number) + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
 		self.logfile                 = open(self.logfilename,'w+')
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
+		self.top_left                = (-1,-1)
+		self.bottom_right            = (-1,-1)
 
 
 	def __str__(self):
@@ -435,6 +437,11 @@ class PexpectSession(object):
 		self.wrap_output(width)
 		return self.output.split('\r\n')
 
+	# TODO: move this functionality into sessionpane
+	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
+		self.top_left     = (top_left_x, top_left_y)
+		self.bottom_right = (bottom_right_x, bottom_right_y)
+
 
 # Represents a pane with no concept of context or content.
 class SessionPane(object):
@@ -459,14 +466,16 @@ def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
 	parser.add_argument('commands', type=str, nargs='?', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
-	#parser.add_argument('-v', default=None, help='Split vertically rather than horizontally.')
+	parser.add_argument('-v', default=None, help='Split vertically rather than horizontally.')
 	parser.add_argument('--replayfile', help='Replay output of an individual file')
 	args = parser.parse_args()
 	# Validate BEGIN
 	if args.commands is None and args.replayfile is None:
 		print('You must supply either a command or a replayfile')
 		parser.print_help(sys.stdout)
-		sys.exit(1)
+		sys.ext(1)
+	if isinstance(args.commands,str):
+		args.commands = [args.commands]
 	# Validate DONE
 	return args
 
@@ -475,7 +484,7 @@ def main():
 	args = process_args()
 	if args.replayfile:
 		print('replayfile')
-	elif args.command:
+	elif args.commands:
 		pexpect_session_manager=PexpectSessionManager(args.l)
 		# TODO: separate out and determine pane layout
 		# TODO: panes then get assigned to sessions before drawing. The
@@ -483,6 +492,7 @@ def main():
 		pexpect_session_manager.setup_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
+			print(session)
 			if session.session_number == 0:
 				main_command_session = session
 			else:

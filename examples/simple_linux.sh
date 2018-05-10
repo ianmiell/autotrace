@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo telemetrise 'find /' 'strace -p PID' 'vmstat 1'
+sudo autotrace 'find /' 'strace -p PID' 'vmstat 1'

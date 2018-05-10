@@ -6,7 +6,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 setup(
-    name='telemetrise',
+    name='autotrace',
  version='0.0.8',
     description='Telemetry on any command',
     author='Ian Miell',
@@ -15,7 +15,7 @@ setup(
     install_requires=['curtsies','pexpect'],
     entry_points={
         'console_scripts': [
-            'telemetrise=telemetrise.telemetrise:main',
+            'autotrace=autotrace.autotrace:main',
         ],
     },
 )
