@@ -1,4 +1,4 @@
-# telemetrise
+# autotrace
 
 Runs a process, and gives you the output along with other telemetry on the
 process, all in one terminal window.
@@ -6,10 +6,10 @@ process, all in one terminal window.
 Here's me seeing what nmap does by looking at strace and tcpdump, with the command:
 
 ```
-sudo telemetrise 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 20000'
+sudo autotrace 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 20000'
 ```
 
-![Demo](https://raw.githubusercontent.com/ianmiell/telemetrise/master/demo.gif)
+![Demo](https://raw.githubusercontent.com/ianmiell/autotrace/master/demo.gif)
 
 ## Features:
 
@@ -19,7 +19,7 @@ sudo telemetrise 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 2000
 
 - Colorised, multi-pane output
 
-- Output of all commands captured to files (in `/tmp/tmptelemetrise/PID/*`)
+- Output of all commands captured to files (in `/tmp/tmpautotrace/PID/*`)
 
 - Raise PR if you want other features
 
@@ -30,7 +30,7 @@ sudo telemetrise 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 2000
 # Requires:
 # python (2 or 3)
 # pip
-pip install telemetrise
+pip install autotrace
 ```
 
 
@@ -39,7 +39,7 @@ pip install telemetrise
 Mac example:
 
 ```
-$ sudo telemetrise \
+$ sudo autotrace \
     'find /' \
     'dtruss -f -p PID' \
     'iostat 1'
@@ -51,7 +51,7 @@ PID is replaced with the PID of the main (-c) command
 Linux example with strace and vmstat:
 
 ```
-$ sudo telemetrise \
+$ sudo autotrace \
     'find /' \
     'strace -p PID' \
     'vmstat 1'
@@ -60,7 +60,7 @@ $ sudo telemetrise \
 Linux example with strace and tcpdump:
 
 ```
-$ sudo telemetrise \
+$ sudo autotrace \
      'nmap localhost' \
      'strace -p PID' \
      'tcpdump -XXs 20000'
@@ -69,7 +69,7 @@ $ sudo telemetrise \
 Example with `while true` script to iterate output:
 
 ```
-$ sudo telemetrise \
+$ sudo autotrace \
     'nmap localhost' \
     'strace -p PID' \
     'tcpdump -XXs 20000' \
@@ -80,7 +80,7 @@ Linux example with more than four panes that can be cycled through by hitting
 'm':
 
 ```
-$ sudo telemetrise \
+$ sudo autotrace \
     'nmap localhost' \
     'strace -p PID' \
     'tcpdump -XXs 20000' \
@@ -91,7 +91,7 @@ $ sudo telemetrise \
 A (Linux) monster:
 
 ```
-$ sudo telemetrise \
+$ sudo autotrace \
     'nmap localhost' \
     'strace -p PID' \
     'tcpdump -XXs 20000' \

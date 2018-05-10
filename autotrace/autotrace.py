@@ -81,43 +81,43 @@ class PexpectSessionManager(object):
 		num_sessions = len(self.pexpect_sessions)
 		if num_sessions <= 4:
 			return False
-		# eg we have bottom_left, bottom_right, top_right, 1, 2
+		# eg we have 1, 2, 3, 4, 5
 		# cycling:
-		#   bottom_left => 2
+		#   1 => 5
+		#   5 => 4
+		#   1 => 3
+		#   3 => 2
 		#   2 => 1
-		#   1 => top_right
-		#   top_right => bottom_right
-		#   bottom_right => bottom_left
 		max_session_number, _ = self.get_number_of_sessions()
 		for session in self.pexpect_sessions:
-			if session.name not in ('top_right','bottom_right','bottom_left','main_command') and max_session_number < int(session.name):
-				max_session_number = int(session.name)
+			if session.session_number not in (3,2,1,0) and max_session_number < int(session.name):
+				max_session_number = session.session_number
 		assert max_session_number > 0
 		for session in self.pexpect_sessions:
-			if session.name == 'top_right':
-				session.name = 'bottom_right'
-			elif session.name == 'bottom_right':
-				session.name = 'bottom_left'
-			elif session.name == 'bottom_left':
-				session.name = str(max_session_number)
-			elif session.name == 'main_command':
+			if session.session_number == 3:
+				session.session_number = 2
+			elif session.session_number == 2:
+				session.session_number = 1 
+			elif session.session_number == 1:
+				session.session_number = str(max_session_number)
+			elif session.session_number == 0:
 				# Do nothing - this does not get touched
 				pass
 			else:
-				assert isinstance(int(session.name), int), 'Broken session name: ' + session.name
-				session_number = int(session.name)
+				assert isinstance(session.session_number, int), 'Broken session number: ' + session.session_number
+				session_number = session.session_number
 				if session_number == 1:
-					session.name = 'top_right'
+					session.session_number = 3
 				else:
-					session.name = str(session_number - 1)
+					session.session_number = str(session_number - 1)
 
 
 	def get_number_of_sessions(self):
 		max_session_number = 0
-		reserved_list = ('top_right','bottom_right','bottom_left','main_command')
+		reserved_list = (3,2,1,0)
 		for session in self.pexpect_sessions:
-			if session.name not in reserved_list and max_session_number < int(session.name):
-				max_session_number = int(session.name)
+			if session.session_number not in reserved_list and max_session_number < session.session_number:
+				max_session_number = session.session_number
 		return max_session_number, max_session_number + len(reserved_list)
 
 
@@ -159,13 +159,13 @@ class PexpectSessionManager(object):
 		# Gather sessions
 		main_command_session, top_right_session, bottom_left_session, bottom_right_session = (None,)*4
 		for session in self.pexpect_sessions:
-			if session.name == 'main_command':
+			if session.session_number == 0:
 				main_command_session = session
-			elif session.name == 'top_right':
+			elif session.session_number == 3:
 				top_right_session = session
-			elif session.name == 'bottom_left':
+			elif session.session_number == 1:
 				bottom_left_session = session
-			elif session.name == 'bottom_right':
+			elif session.session_number == 2:
 				bottom_right_session = session
 		# Validate BEGIN
 		assert main_command_session, self.quit_autotrace('Main command session not found in draw_screen')
@@ -298,7 +298,7 @@ class PexpectSessionManager(object):
 		else:
 			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
 			top_right_command = self.replace_pid(top_right_command, str(main_session.pid))
-			top_right_session = PexpectSession(top_right_command,self,'top_right')
+			top_right_session = PexpectSession(top_right_command,self,3)
 			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
 		if bottom_left_command is None:
@@ -308,13 +308,13 @@ class PexpectSessionManager(object):
 				bottom_left_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			bottom_left_command = self.replace_pid(bottom_left_command, str(main_session.pid))
-		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left')
+		bottom_left_session = PexpectSession(bottom_left_command,self,1)
 		if bottom_right_command is None:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		else:
 			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
 			bottom_right_command = self.replace_pid(bottom_right_command, str(main_session.pid))
-			bottom_right_session = PexpectSession(bottom_right_command,self,'bottom_right')
+			bottom_right_session = PexpectSession(bottom_right_command,self,2)
 			bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 
 		# Set up any other sessions to be set up.
@@ -333,19 +333,19 @@ class PexpectSessionManager(object):
 
 	def pause_sessions(self):
 		for session in self.pexpect_sessions:
-			if session.name == 'main_command':
+			if session.session_number == 0:
 				pexpect.run('kill -STOP ' + str(session.pid))
 		for session in self.pexpect_sessions:
-			if session.name != 'main_command':
+			if session.session_number != 0:
 				pexpect.run('kill -STOP ' + str(session.pid))
 
 
 	def unpause_sessions(self):
 		for session in self.pexpect_sessions:
-			if session.name != 'main_command':
+			if session.session_number != 0:
 				pexpect.run('kill -CONT ' + str(session.pid))
 		for session in self.pexpect_sessions:
-			if session.name == 'main_command':
+			if session.session_number == 0:
 				pexpect.run('kill -CONT ' + str(session.pid))
 
 
@@ -358,44 +358,37 @@ class PexpectSessionManager(object):
 class PexpectSession(object):
 
 
-	def __init__(self,command, pexpect_session_manager, name, encoding='utf-8'):
+	def __init__(self,command, pexpect_session_manager, session_number, encoding='utf-8'):
 		self.pexpect_session         = None
-		self.name                    = name
+		self.session_number          = session_number
 		self.command                 = command
 		self.output                  = ''
 		self.pid                     = -1
 		self.encoding                = encoding
 		self.pexpect_session_manager = pexpect_session_manager
-		self.top_left                = (-1,-1)
-		self.bottom_right            = (-1,-1)
 		self.logfilename             = pexpect_session_manager.logdir + '/' + name + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
 		self.logfile                 = open(self.logfilename,'w+')
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
-		if self.name == 'main_command':
+		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
 
 
 	def __str__(self):
 		string = ''
-		string += '\nname: ' + str(self.name)
+		string += '\nsession_number: ' + str(self.session_number)
 		string += '\ncommand: ' + str(self.command)
 		string += '\npid: ' + str(self.pid)
-		string += '\ntop_left: ' + str(self.top_left)
-		string += '\nbottom_right: ' + str(self.bottom_right)
 		return string
 
 
 	def spawn(self):
 		self.pexpect_session         = pexpect.spawn(self.command)
 		self.pid                     = self.pexpect_session.pid
-		if self.name == 'main_command':
+		if self.session_number == 0:
 			pexpect.run('kill -STOP ' + str(self.pid))
 
 
-	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
-		self.top_left     = (top_left_x, top_left_y)
-		self.bottom_right = (bottom_right_x, bottom_right_y)
 
 
 	def write_to_logfile(self, msg):
@@ -404,8 +397,6 @@ class PexpectSession(object):
 
 
 	def read_line(self,timeout=0.1):
-		assert self.top_left     != (-1,-1), self.pexpect_session_manager.quit_autotrace('top_left position unset')
-		assert self.bottom_right != (-1,-1), self.pexpect_session_manager.quit_autotrace('bottom_right position unset')
 		if not self.pexpect_session:
 			return False
 		string = None
@@ -445,11 +436,30 @@ class PexpectSession(object):
 		return self.output.split('\r\n')
 
 
+# Represents a pane with no concept of context or content.
+class SessionPane(object):
+
+	def __init__(self, name):
+		self.name                    = name
+		self.top_left                = (-1,-1)
+		self.bottom_right            = (-1,-1)
+
+	def __str__(self):
+		string = ''
+		string += '\ntop_left: ' + str(self.top_left)
+		string += '\nbottom_right: ' + str(self.bottom_right)
+		return string
+
+	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
+		self.top_left     = (top_left_x, top_left_y)
+		self.bottom_right = (bottom_right_x, bottom_right_y)
+
+
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
 	parser.add_argument('commands', type=str, nargs='?', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
-	parser.add_argument('-v', default=None, help='Split vertically rather than horizontally.')
+	#parser.add_argument('-v', default=None, help='Split vertically rather than horizontally.')
 	parser.add_argument('--replayfile', help='Replay output of an individual file')
 	args = parser.parse_args()
 	# Validate BEGIN
@@ -467,10 +477,13 @@ def main():
 		print('replayfile')
 	elif args.command:
 		pexpect_session_manager=PexpectSessionManager(args.l)
+		# TODO: separate out and determine pane layout
+		# TODO: panes then get assigned to sessions before drawing. The
+		#       relationship will be that the session will be assigned to at most 1 pane (or None).
 		pexpect_session_manager.setup_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
-			if session.name == 'main_command':
+			if session.session_number == 0:
 				main_command_session = session
 			else:
 				session.spawn()
