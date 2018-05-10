@@ -470,7 +470,7 @@ def main():
 			pexpect_session_manager.refresh_window()
 
 
-telemetrise_version='0.0.1'
+telemetrise_version='0.0.7'
 
 if __name__ == '__main__':
 	main()
