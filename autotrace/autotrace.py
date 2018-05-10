@@ -157,21 +157,21 @@ class PexpectSessionManager(object):
 
 	def draw_sessions(self, screen_arr):
 		# Gather sessions
-		main_command_session, top_right_session, bottom_left_session, bottom_right_session = (None,)*4
+		main_command_session, session_3, session_1, session_2 = (None,)*4
 		for session in self.pexpect_sessions:
 			if session.session_number == 0:
 				main_command_session = session
 			elif session.session_number == 3:
-				top_right_session = session
+				session_3 = session
 			elif session.session_number == 1:
-				bottom_left_session = session
+				session_1 = session
 			elif session.session_number == 2:
-				bottom_right_session = session
+				session_2 = session
 		# Validate BEGIN
 		assert main_command_session, self.quit_autotrace('Main command session not found in draw_screen')
-		assert bottom_left_session, self.quit_autotrace('Bottom left session not found in draw_screen')
+		assert session_1, self.quit_autotrace('Bottom left session not found in draw_screen')
 
-		if top_right_session and not bottom_right_session:
+		if session_3 and not session_2:
 			self.quit_autotrace(msg='-t without -r is not allowed. Use -l or -r instead of -t')
 		# Validate DONE
 
@@ -186,26 +186,26 @@ class PexpectSessionManager(object):
 
 		# Top half
 		if main_command_session.output != '':
-			if top_right_session:
+			if session_3:
 				lines = main_command_session.get_lines(self.wwidth_left_end)
 			else:
 				lines = main_command_session.get_lines(self.wwidth)
 			for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
 				self.screen_arr[i:i+1, 0:len(line)] = [green(line)]
-		if top_right_session:
-			if top_right_session.output != '':
-				lines = top_right_session.get_lines(self.wwidth_left_end)
+		if session_3:
+			if session_3.output != '':
+				lines = session_3.get_lines(self.wwidth_left_end)
 				for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
 					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
 		# Bottom half
-		if bottom_left_session.output != '':
-			lines = bottom_left_session.get_lines(self.wwidth_left_end)
+		if session_1.output != '':
+			lines = session_1.get_lines(self.wwidth_left_end)
 			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 				self.screen_arr[i:i+1, 0:len(line)] = [red(line)]
-		if bottom_right_session:
-			if bottom_right_session.output != '':
-				lines = bottom_right_session.get_lines(self.wwidth_left_end)
+		if session_2:
+			if session_2.output != '':
+				lines = session_2.get_lines(self.wwidth_left_end)
 				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
 					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
 
@@ -274,48 +274,48 @@ class PexpectSessionManager(object):
 	def setup_commands(self, args):
 		num_commands = len(args.commands)
 		assert num_commands >= 1, self.quit_autotrace('Not enough commands! Must be at least two.')
-		bottom_left_command  = None
-		bottom_right_command = None
-		top_right_command    = None
+		session_1_command  = None
+		session_2_command = None
+		session_3_command    = None
 
 		main_command         = args.commands[0]
 		if num_commands > 1:
-			bottom_left_command  = args.commands[1]
+			session_1_command  = args.commands[1]
 		else:
-			bottom_left_command  = None
+			session_1_command  = None
 		if num_commands > 2:
-			bottom_right_command = args.commands[2]
+			session_2_command = args.commands[2]
 		if num_commands > 3:
-			top_right_command    = args.commands[3]
+			session_3_command    = args.commands[3]
 		remaining_commands = args.commands[3:]
 		args = None
 
 		# Main command
 		main_session = PexpectSession(main_command, self,0)
 		main_session.spawn()
-		if top_right_command is None:
+		if session_3_command is None:
 			main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
 		else:
 			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
-			top_right_command = self.replace_pid(top_right_command, str(main_session.pid))
-			top_right_session = PexpectSession(top_right_command,self,3)
-			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
+			session_3_command = self.replace_pid(session_3_command, str(main_session.pid))
+			session_3 = PexpectSession(session_3_command,self,3)
+			session_3.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
-		if bottom_left_command is None:
+		if session_1_command is None:
 			if platform.system() == 'Darwin':
-				bottom_left_command = 'dtruss -f -p ' + str(main_session.pid)
+				session_1_command = 'dtruss -f -p ' + str(main_session.pid)
 			else:
-				bottom_left_command = 'strace -tt -f -p ' + str(main_session.pid)
+				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
-			bottom_left_command = self.replace_pid(bottom_left_command, str(main_session.pid))
-		bottom_left_session = PexpectSession(bottom_left_command,self,1)
-		if bottom_right_command is None:
-			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+			session_1_command = self.replace_pid(session_1_command, str(main_session.pid))
+		session_1 = PexpectSession(session_1_command,self,1)
+		if session_2_command is None:
+			session_1.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 		else:
-			bottom_left_session.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
-			bottom_right_command = self.replace_pid(bottom_right_command, str(main_session.pid))
-			bottom_right_session = PexpectSession(bottom_right_command,self,2)
-			bottom_right_session.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+			session_1.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
+			session_2_command = self.replace_pid(session_2_command, str(main_session.pid))
+			session_2 = PexpectSession(session_2_command,self,2)
+			session_2.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
 
 		# Set up any other sessions to be set up.
 		count = 0
