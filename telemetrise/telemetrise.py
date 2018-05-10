@@ -19,6 +19,10 @@ from curtsies.input import Input
 #       - put elapsed time in before each line
 #       - replayer will 'just' read through the output files in the logs 
 #       - replayer should therefore take 'replay' and 'logfolder' as an argument
+#       - it will work by, for each logfile:
+#         - start a telemetrise process (because we know telemetrise will be installed) that:
+#           - reads next line, gobble the time, wait that long and echo the line to stdout
+#           - should the first line of the logfile be the command name?
 
 class PexpectSessionManager(object):
 
@@ -443,31 +447,45 @@ class PexpectSession(object):
 
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
-	parser.add_argument('commands', type=str, nargs='+', help='''Commands to telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
-	parser.add_argument('-l', default=None, help=''' telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
-	return parser.parse_args()
+	parser.add_argument('commands', type=str, nargs='?', help='''Commands to telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
+	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
+	parser.add_argument('--replayfile', help='Replay output of an individual file')
+	args = parser.parse_args()
+	# Validate BEGIN
+	if args.commands is None and args.replayfile is None:
+		print('You must supply either a command or a replayfile')
+		parser.print_help(sys.stdout)
+		sys.exit(1)
+	# Validate DONE
+	return args
 
 
 def main():
 	args = process_args()
-	pexpect_session_manager=PexpectSessionManager(args.l)
-	pexpect_session_manager.setup_commands(args)
-	main_command_session = None
-	for session in pexpect_session_manager.pexpect_sessions:
-		if session.name == 'main_command':
-			main_command_session = session
-		else:
-			session.spawn()
-	assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
-	pexpect.run('kill -CONT ' + str(main_command_session.pid))
-	while True:
-		try:
-			while True:
-				pexpect_session_manager.draw_screen('sessions')
-				pexpect_session_manager.handle_sessions()
-				pexpect_session_manager.handle_input()
-		except KeyboardInterrupt:
-			pexpect_session_manager.refresh_window()
+	if args.replayfile:
+		print('replayfile')
+	elif args.command:
+		pexpect_session_manager=PexpectSessionManager(args.l)
+		pexpect_session_manager.setup_commands(args)
+		main_command_session = None
+		for session in pexpect_session_manager.pexpect_sessions:
+			if session.name == 'main_command':
+				main_command_session = session
+			else:
+				session.spawn()
+		assert main_command_session, pexpect_session_manager.quit_telemetrise('No main command session set up!')
+		pexpect.run('kill -CONT ' + str(main_command_session.pid))
+		while True:
+			try:
+				while True:
+					pexpect_session_manager.draw_screen('sessions')
+					pexpect_session_manager.handle_sessions()
+					pexpect_session_manager.handle_input()
+			except KeyboardInterrupt:
+				pexpect_session_manager.refresh_window()
+	else:
+		print('Should not get here 1')
+		assert False
 
 
 telemetrise_version='0.0.8'
