@@ -13,6 +13,7 @@ from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
 # TODO: implement help
+# TODO: toggle for showing commands in panes, highlight
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -43,6 +44,7 @@ class PexpectSessionManager(object):
 		self.logfile              = open(self.logfilename,'w+')
 		os.chmod(self.logfilename,0o777)
 		# Does user have root?
+		# TODO: emit warning?
 		self.root_ready     = False
 		if os.getuid() == 0:
 			self.root_ready = True
@@ -296,16 +298,10 @@ class PexpectSessionManager(object):
 			top_right_session.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
 		# Default for bottom left is syscall tracer
 		if bottom_left_command is None:
-			# TODO: use password retrieved elsewhere and add command
-			#if self.root_ready:
-			#	sudo = ''
-			#else:
-			#	sudo = 'echo ' + password + ' | sudo -S -n echo && ')
-			sudo = ''
 			if platform.system() == 'Darwin':
-				bottom_left_command = sudo + 'dtruss -f -p ' + str(main_session.pid)
+				bottom_left_command = 'dtruss -f -p ' + str(main_session.pid)
 			else:
-				bottom_left_command = sudo + 'strace -tt -f -p ' + str(main_session.pid)
+				bottom_left_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			bottom_left_command = self.replace_pid(bottom_left_command, str(main_session.pid))
 		bottom_left_session = PexpectSession(bottom_left_command,self,'bottom_left')
@@ -332,7 +328,6 @@ class PexpectSessionManager(object):
 
 
 	def pause_sessions(self):
-		# TODO: handle sudo if needed
 		for session in self.pexpect_sessions:
 			if session.name == 'main_command':
 				pexpect.run('kill -STOP ' + str(session.pid))
@@ -342,7 +337,6 @@ class PexpectSessionManager(object):
 
 
 	def unpause_sessions(self):
-		# TODO: handle sudo if needed
 		for session in self.pexpect_sessions:
 			if session.name != 'main_command':
 				pexpect.run('kill -CONT ' + str(session.pid))
@@ -376,12 +370,6 @@ class PexpectSession(object):
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.name == 'main_command':
 			pexpect_session_manager.main_command_session = self
-		if command.strip()[:4] == 'sudo':
-			self.needs_root = True
-		else:
-			self.needs_root              = False
-		if self.needs_root and not self.pexpect_session_manager.root_ready:
-			make_root_ready()
 
 
 	def __str__(self):
@@ -458,14 +446,6 @@ def process_args():
 	parser.add_argument('commands', type=str, nargs='+', help='''Commands to telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help=''' telemetrise, separated by spaces, eg: "telemetrise 'find /' 'strace -p PID' 'vmstat 1'"''')
 	return parser.parse_args()
-
-
-def make_root_ready():
-	# If we have sudo, then this returns True, else false.
-	if os.getuid() == 0:
-		return True, ''
-	password = getpass.getpass("[sudo] password: ")
-	return True, password
 
 
 def main():
