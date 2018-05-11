@@ -10,7 +10,6 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
-
 # TODO: implement help
 # TODO: toggle for showing commands in panes, highlight
 # TODO: default to 'strace the last thing you ran'?
@@ -96,12 +95,7 @@ class PexpectSessionManager(object):
 		if num_sessions <= 4:
 			return False
 		# eg we have 1, 2, 3, 4, 5
-		# cycling:
-		#   1 => 5
-		#   5 => 4
-		#   1 => 3
-		#   3 => 2
-		#   2 => 1
+		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
 		max_session_number, _ = self.get_number_of_sessions()
 		for session in self.pexpect_sessions:
 			if session.session_number not in (3,2,1,0) and max_session_number < int(session.name):
@@ -127,7 +121,7 @@ class PexpectSessionManager(object):
 
 	def get_number_of_sessions(self):
 		max_session_number = 0
-		reserved_list = (3,2,1,0)
+		reserved_list = (0,1,2,3)
 		for session in self.pexpect_sessions:
 			if session.session_number not in reserved_list and max_session_number < session.session_number:
 				max_session_number = session.session_number
@@ -384,9 +378,6 @@ class PexpectSessionManager(object):
 		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
 
 
-
-
-
 class PexpectSession(object):
 
 	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, encoding='utf-8'):
@@ -549,8 +540,6 @@ def main():
 	else:
 		print('Should not get here 1')
 		assert False
-
-
 
 
 autotrace_version='0.0.8'
