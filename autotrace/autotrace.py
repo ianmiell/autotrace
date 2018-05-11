@@ -12,13 +12,8 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
-debug = False
-
-# TODO: cycle windows
-# TODO: session 3 covering up main?
 
 # TODO: implement help
-# TODO: debug mode where screen is not drawn
 # TODO: toggle for showing commands in panes, highlight
 # TODO: default to 'strace the last thing you ran'?
 # TODO: replay function?
@@ -35,9 +30,10 @@ class PexpectSessionManager(object):
 
 	only_one = None
 
-	def __init__(self, logdir=None):
+	def __init__(self, logdir=None, debug=False):
 		# Singleton
 		assert self.only_one is None
+		self.debug = False
 		self.only_one             = True
 		self.pexpect_sessions     = []
 		self.status               = 'Running'
@@ -68,6 +64,12 @@ class PexpectSessionManager(object):
 		string += '\nwheight: ' + str(self.wheight)
 		string += '\nwwidth: ' + str(self.wwidth)
 		return string
+
+	def debug_msg(self, msg,pause=None):
+		if self.debug:
+			print(msg)
+		if pause:
+			time.sleep(pause)
 
 	def refresh_window(self):
 		self.window               = curtsies.FullscreenWindow()
@@ -152,8 +154,7 @@ class PexpectSessionManager(object):
 			self.draw_sessions(self.screen_arr)
 		elif draw_type == 'help':
 			self.draw_help(self.screen_arr)
-		global debug
-		if not debug:
+		if not self.debug:
 			# We're done, now render.
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
@@ -192,8 +193,6 @@ class PexpectSessionManager(object):
 			else:
 				lines = main_command_session.get_lines(self.wwidth)
 			# Split the lines by newline, then reversed and zip up with line 2 to halfway.
-			#debug_msg(lines)
-			#sys.exit(1)
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
 				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [green(line)]
 		if session_3 and session_3.output != '':
@@ -232,10 +231,8 @@ class PexpectSessionManager(object):
 		seen_output = False
 		while not seen_output:
 			for session in self.pexpect_sessions:
-				#debug_msg('In handle_sessions: session: ' + str(session))
 				if session.read_line():
 					seen_output = True
-		#self.debug_screen_array(self.screen_arr)
 
 	def handle_input(self):
 		with Input() as input_generator:
@@ -343,17 +340,10 @@ class PexpectSessionManager(object):
 			other_command = self.replace_pid(other_command, str(main_session.pid))
 			other_session = PexpectSession(other_command, self, count)
 			count += 1
-		# DEBUG
-		debug_msg(self)
-		for session in self.pexpect_sessions:
-			if session.session_pane:
-				debug_msg(session.session_pane)
-
 
 	def replace_pid(self, string, pid_str):
 		assert isinstance(pid_str, str)
 		return string.replace('PID', pid_str)
-
 
 	def pause_sessions(self):
 		for session in self.pexpect_sessions:
@@ -362,7 +352,6 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.session_number != 0:
 				pexpect.run('kill -STOP ' + str(session.pid))
-
 
 	def unpause_sessions(self):
 		for session in self.pexpect_sessions:
@@ -376,6 +365,7 @@ class PexpectSessionManager(object):
 		return str(time.time() - self.start_time)
 
 	def debug_screen_array(self, screen_arr):
+		# TODO make this work?
 		x, y = 0, 0
 		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY============')
 		self.pexpect_sessions[0].write_to_logfile('height: ' + str(screen_arr.height))
@@ -528,30 +518,16 @@ def process_args():
 		print('-v and more than two commands supplied. -v does not make sense, so dropping that arg.')
 		args.v = False
 		time.sleep(1)
-	if args.d:
-		global debug
-		debug = True
-	# Validate DONE
-	debug_msg(args,0.5)
 	return args
 
 
-def debug_msg(msg,pause=None):
-	global debug
-	if debug:
-		print(msg)
-	if pause:
-		time.sleep(pause)
 
 def main():
 	args = process_args()
 	if args.replayfile:
 		print('replayfile')
 	elif args.commands:
-		pexpect_session_manager=PexpectSessionManager(args.l)
-		# TODO: separate out and determine pane layout
-		# TODO: panes then get assigned to sessions before drawing. The
-		#       relationship will be that the session will be assigned to at most 1 pane (or None).
+		pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 		pexpect_session_manager.initialize_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
@@ -564,11 +540,8 @@ def main():
 		while True:
 			try:
 				while True:
-					debug_msg('About to draw screen')
 					pexpect_session_manager.draw_screen('sessions')
-					debug_msg('About to handle_sessions')
 					pexpect_session_manager.handle_sessions()
-					debug_msg('About to handle_input')
 					pexpect_session_manager.handle_input()
 			except KeyboardInterrupt:
 				pexpect_session_manager.refresh_window()
