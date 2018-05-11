@@ -142,57 +142,13 @@ class PexpectSessionManager(object):
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
 
 		if draw_type == 'sessions':
-			self.draw_sessions()
+			for session in self.pexpect_sessions:
+				session.write_out_session()
 		elif draw_type == 'help':
 			self.draw_help()
 		if not self.debug:
 			# We're done, now render.
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
-
-	def draw_sessions(self):
-		# Gather sessions
-		main_command_session, session_3, session_1, session_2 = (None,)*4
-		for session in self.pexpect_sessions:
-			if session.session_number == 0:
-				main_command_session = session
-			elif session.session_number == 3:
-				session_3 = session
-			elif session.session_number == 1:
-				session_1 = session
-			elif session.session_number == 2:
-				session_2 = session
-		# Validate BEGIN
-		assert main_command_session, self.quit_autotrace('Main command session not found in draw_screen')
-		assert session_1, self.quit_autotrace('Bottom left session not found in draw_screen')
-		if session_3 and not session_2:
-			self.quit_autotrace(msg='-t without -r is not allowed. Use -l or -r instead of -t')
-		# Validate DONE
-
-		# Main session
-		if main_command_session.output != '':
-			pane = main_command_session.session_pane
-			pane_width = pane.get_width()
-			lines = main_command_session.get_lines(pane_width)
-			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
-				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [green(line)]
-		if session_3 and session_3.output != '':
-			pane = session_3.session_pane
-			lines = session_3.get_lines(pane.get_width())
-			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
-				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
-
-		# Main tracer
-		if session_1.output != '':
-			pane = session_1.session_pane
-			lines = session_1.get_lines(pane.get_width())
-			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
-				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
-		if session_2:
-			if session_2.output != '':
-				pane = session_2.session_pane
-				lines = session_2.get_lines(pane.get_width())
-				for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
-					self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
 
 	def draw_help(self):
 		help_text_lines = ['Placeholder text',]
@@ -283,7 +239,7 @@ class PexpectSessionManager(object):
 		args = None
 
 		# Main command setup
-		main_session = PexpectSession(main_command, self, 0, pane_name='top_left')
+		main_session = PexpectSession(main_command, self, 0, pane_name='top_left', pane_color=green)
 		main_session.spawn()
 		if session_3_command is None:
 			if vertically_split:
@@ -326,7 +282,6 @@ class PexpectSessionManager(object):
 			other_session = PexpectSession(other_command, self, count)
 			self.pexpect_sessions.append(other_session)
 			count += 1
-
 
 	def pause_sessions(self):
 		for session in self.pexpect_sessions:
@@ -372,7 +327,7 @@ class PexpectSessionManager(object):
 
 class PexpectSession(object):
 
-	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, encoding='utf-8'):
+	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, pane_color=red, encoding='utf-8'):
 		self.pexpect_session         = None
 		self.session_number          = session_number
 		self.command                 = command
@@ -387,7 +342,7 @@ class PexpectSession(object):
 		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
 		if pane_name:
-			self.session_pane            = SessionPane(pane_name)
+			self.session_pane            = SessionPane(pane_name, pane_color)
 			self.session_pane.top_left   = (-1,-1)
 			self.session_pane.bottom_right            = (-1,-1)
 		else:
@@ -400,6 +355,14 @@ class PexpectSession(object):
 		string += '\ncommand: ' + str(self.command)
 		string += '\npid: ' + str(self.pid)
 		return string
+
+
+	def write_out_session(self):
+		pane = self.session_pane
+		if pane:
+			lines = self.get_lines(pane.get_width())
+			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
+				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [pane.color(line)]
 
 	def spawn(self):
 		self.pexpect_session         = pexpect.spawn(self.command)
@@ -452,12 +415,13 @@ class PexpectSession(object):
 # Represents a pane with no concept of context or content.
 class SessionPane(object):
 
-	def __init__(self, name):
+	def __init__(self, name, color):
 		self.name                    = name
 		self.top_left_x              = -1
 		self.top_left_y              = -1
 		self.bottom_right_x          = -1
 		self.bottom_right_y          = -1
+		self.color                   = color
 
 	def __str__(self):
 		string = ''
