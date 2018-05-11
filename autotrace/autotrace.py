@@ -308,7 +308,7 @@ class PexpectSessionManager(object):
 			# At least 3 sessions
 			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
 			# Session 3 setup
-			session_3_command = self.replace_pid(session_3_command, str(main_session.pid))
+			session_3_command = replace_pid(session_3_command, str(main_session.pid))
 			session_3 = PexpectSession(session_3_command, self, 3, 'top_right')
 			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 		# Session 1 setup
@@ -319,7 +319,7 @@ class PexpectSessionManager(object):
 			else:
 				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
-			session_1_command = self.replace_pid(session_1_command, str(main_session.pid))
+			session_1_command = replace_pid(session_1_command, str(main_session.pid))
 		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left')
 		if session_2_command is None:
 			# Two panes only
@@ -329,21 +329,18 @@ class PexpectSessionManager(object):
 				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 		else:
 			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
-			session_2_command = self.replace_pid(session_2_command, str(main_session.pid))
+			session_2_command = replace_pid(session_2_command, str(main_session.pid))
 			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right')
 			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 		# Set up any other sessions to be set up with no panes.
 		count = 4
 		for other_command in remaining_commands:
-			other_command = self.replace_pid(other_command, str(main_session.pid))
+			other_command = replace_pid(other_command, str(main_session.pid))
 			other_session = PexpectSession(other_command, self, count)
 			pexpect_session_manager.pexpect_sessions.append(other_session)
 			count += 1
 
-	def replace_pid(self, string, pid_str):
-		assert isinstance(pid_str, str)
-		return string.replace('PID', pid_str)
 
 	def pause_sessions(self):
 		for session in self.pexpect_sessions:
@@ -521,6 +518,10 @@ def process_args():
 	return args
 
 
+def replace_pid(string, pid_str):
+	assert isinstance(pid_str, str)
+	return string.replace('PID', pid_str)
+
 
 def main():
 	args = process_args()
@@ -548,6 +549,9 @@ def main():
 	else:
 		print('Should not get here 1')
 		assert False
+
+
+
 
 autotrace_version='0.0.8'
 if __name__ == '__main__':
