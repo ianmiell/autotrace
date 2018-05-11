@@ -4,8 +4,6 @@ import argparse
 import platform
 import os
 import sys
-import getpass
-import logging
 import time
 import pexpect
 import curtsies
@@ -19,7 +17,7 @@ from curtsies.input import Input
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
-#       - replayer will 'just' read through the output files in the logs 
+#       - replayer will 'just' read through the output files in the logs
 #       - replayer should therefore take 'replay' and 'logfolder' as an argument
 #       - it will work by, for each logfile:
 #         - start a autotrace process (because we know autotrace will be installed) that:
@@ -33,7 +31,7 @@ class PexpectSessionManager(object):
 	def __init__(self, logdir=None, debug=False):
 		# Singleton
 		assert self.only_one is None
-		self.debug = False
+		self.debug                = debug
 		self.only_one             = True
 		self.pexpect_sessions     = []
 		self.status               = 'Running'
@@ -58,6 +56,7 @@ class PexpectSessionManager(object):
 		# Setup
 		self.refresh_window()
 		self.start_time           = time.time()
+		self.screen_arr           = None
 
 	def __str__(self):
 		string = ''
@@ -112,7 +111,7 @@ class PexpectSessionManager(object):
 			if session.session_number == 3:
 				session.session_number = 2
 			elif session.session_number == 2:
-				session.session_number = 1 
+				session.session_number = 1
 			elif session.session_number == 1:
 				session.session_number = str(max_session_number)
 			elif session.session_number == 0:
@@ -151,21 +150,21 @@ class PexpectSessionManager(object):
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
 
 		if draw_type == 'sessions':
-			self.draw_sessions(self.screen_arr)
+			self.draw_sessions()
 		elif draw_type == 'help':
-			self.draw_help(self.screen_arr)
+			self.draw_help()
 		if not self.debug:
 			# We're done, now render.
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
-	def draw_help(self, screen_arr):
+	def draw_help(self):
 		help_text_lines = ['Placeholder text',]
 		i=2
 		for line in help_text_lines:
 			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
 			i += 1
 
-	def draw_sessions(self, screen_arr):
+	def draw_sessions(self):
 		# Gather sessions
 		main_command_session, session_3, session_1, session_2 = (None,)*4
 		for session in self.pexpect_sessions:
@@ -339,6 +338,7 @@ class PexpectSessionManager(object):
 		for other_command in remaining_commands:
 			other_command = self.replace_pid(other_command, str(main_session.pid))
 			other_session = PexpectSession(other_command, self, count)
+			pexpect_session_manager.pexpect_sessions.append(other_session)
 			count += 1
 
 	def replace_pid(self, string, pid_str):
