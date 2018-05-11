@@ -86,9 +86,6 @@ class PexpectSessionManager(object):
 
 	def cycle_panes(self):
 		# Must have more than 4 panes to do a cycle (including main command)
-		for session in self.pexpect_sessions:
-			print(session)
-		sys.exit(1)
 		num_sessions = len(self.pexpect_sessions)
 		if num_sessions <= 4:
 			return False
@@ -140,14 +137,13 @@ class PexpectSessionManager(object):
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
 		footer_text = self.status + space + quick_help
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
-
+		# Draw the sessions.
 		if draw_type == 'sessions':
 			for session in self.pexpect_sessions:
 				session.write_out_session()
 		elif draw_type == 'help':
 			self.draw_help()
 		if not self.debug:
-			# We're done, now render.
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
 	def draw_help(self):
