@@ -13,7 +13,9 @@ from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
 # TODO: implement help
+# TODO: debug mode where screen is not drawn
 # TODO: toggle for showing commands in panes, highlight
+# TODO: default to 'strace the last thing you ran'?
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -55,6 +57,12 @@ class PexpectSessionManager(object):
 		# Setup
 		self.refresh_window()
 		self.start_time           = time.time()
+
+	def __str__(self):
+		string = ''
+		string += '\nwheight: ' + str(self.wheight)
+		string += '\nwwidth: ' + str(self.wwidth)
+		return string
 
 
 	def refresh_window(self):
@@ -142,8 +150,10 @@ class PexpectSessionManager(object):
 		elif draw_type == 'help':
 			self.draw_help(self.screen_arr)
 
-		# We're done, now render.
-		self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
+		global debug
+		if not debug:
+			# We're done, now render.
+			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
 
 	def draw_help(self, screen_arr):
@@ -153,7 +163,6 @@ class PexpectSessionManager(object):
 			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
 			i += 1
 		
-
 
 	def draw_sessions(self, screen_arr):
 		# Gather sessions
@@ -170,44 +179,43 @@ class PexpectSessionManager(object):
 		# Validate BEGIN
 		assert main_command_session, self.quit_autotrace('Main command session not found in draw_screen')
 		assert session_1, self.quit_autotrace('Bottom left session not found in draw_screen')
-
 		if session_3 and not session_2:
 			self.quit_autotrace(msg='-t without -r is not allowed. Use -l or -r instead of -t')
 		# Validate DONE
 
-
-		# Helper function to render subwindow - BUGGY?
-		# Test with: python autotrace/autotrace.py -l 'ping bing.com' -r 'ping cnn.com' -t 'ping bbc.co.uk' ping google.com
-		def render_subwindow(lines, row_range_start, row_range_end, col_range_start, color):
-			for i, line in zip(reversed(range(row_range_start,row_range_end)), reversed(lines)):
-				self.screen_arr[i:i+1, col_range_start:len(line)] = [color(line)]
-
-		# Split the lines by newline, then reversed and zip up with line 2 to halfway.
-
-		# Top half
+		# Main session
 		if main_command_session.output != '':
+			pane = main_command_session.session_pane
+			lines = main_command_session.get_lines(pane.get_width())
 			if session_3:
 				lines = main_command_session.get_lines(self.wwidth_left_end)
 			else:
 				lines = main_command_session.get_lines(self.wwidth)
-			for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
-				self.screen_arr[i:i+1, 0:len(line)] = [green(line)]
-		if session_3:
-			if session_3.output != '':
-				lines = session_3.get_lines(self.wwidth_left_end)
-				for i, line in zip(reversed(range(1,self.wheight_top_end)), reversed(lines)):
-					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
+			# Split the lines by newline, then reversed and zip up with line 2 to halfway.
+			#debug_msg(lines)
+			#sys.exit(1)
+			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
+				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [green(line)]
+		if session_3 and session_3.output != '':
+			pane = session_3.session_pane
+			lines = session_3.get_lines(pane.get_width())
+			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
+				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
 
-		# Bottom half
+		# Main tracer
 		if session_1.output != '':
-			lines = session_1.get_lines(self.wwidth_left_end)
-			for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
-				self.screen_arr[i:i+1, 0:len(line)] = [red(line)]
+			#lines = session_1.get_lines(self.wwidth_left_end)
+			#pane = session_1.session_pane
+			pane = session_1.session_pane
+			lines = session_1.get_lines(pane.get_width())
+			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
+				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
 		if session_2:
 			if session_2.output != '':
-				lines = session_2.get_lines(self.wwidth_left_end)
-				for i, line in zip(reversed(range(self.wheight_bottom_start,self.wheight-1)), reversed(lines)):
-					self.screen_arr[i:i+1, self.wwidth_right_start:self.wwidth_right_start+len(line)] = [red(line)]
+				pane = session_2.session_pane
+				lines = session_2.get_lines(pane.get_width())
+				for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
+					self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
 
 
 	def quit_autotrace(self, msg='All done.'):
@@ -226,6 +234,7 @@ class PexpectSessionManager(object):
 		seen_output = False
 		while not seen_output:
 			for session in self.pexpect_sessions:
+				#debug_msg('In handle_sessions: session: ' + str(session))
 				if session.read_line():
 					seen_output = True
 
@@ -271,12 +280,13 @@ class PexpectSessionManager(object):
 				self.write_to_logfile(input_char)
 
 
-	def setup_commands(self, args):
+	# Handles initial placement of sessions and panes.
+	def initialize_commands(self, args):
 		num_commands = len(args.commands)
 		assert num_commands >= 1, self.quit_autotrace('Not enough commands! Must be at least two.')
-		session_1_command  = None
+		session_1_command = None
 		session_2_command = None
-		session_3_command    = None
+		session_3_command = None
 
 		main_command         = args.commands[0]
 		if num_commands > 1:
@@ -288,19 +298,27 @@ class PexpectSessionManager(object):
 		if num_commands > 3:
 			session_3_command    = args.commands[3]
 		remaining_commands = args.commands[3:]
+		vertically_split = args.v
+		assert not args.v or session_2_command is None, 'BUG! Vertical arg should be off at this point if session_2 exists'
 		args = None
 
-		# Main command
-		main_session = PexpectSession(main_command, self,0)
+		# Main command setup
+		main_session = PexpectSession(main_command, self, 0, pane_name='top_left')
 		main_session.spawn()
 		if session_3_command is None:
-			main_session.set_position(0,0,self.wwidth,self.wheight_bottom_start-1)
+			if vertically_split:
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+			else:
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 		else:
-			main_session.set_position(0,0,self.wwidth_left_end,self.wheight_bottom_start-1)
+			# At least 3 sessions
+			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.height_bottom_start-1)
+			# Session 3 setup
 			session_3_command = self.replace_pid(session_3_command, str(main_session.pid))
-			session_3 = PexpectSession(session_3_command,self,3)
-			session_3.set_position(0,self.wwidth_right_start,self.wwidth,self.wheight_bottom_start-1)
-		# Default for bottom left is syscall tracer
+			session_3 = PexpectSession(session_3_command, self, 3, 'top_right')
+			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+		# Session 1 setup
+		# Default tracer is a syscall tracer
 		if session_1_command is None:
 			if platform.system() == 'Darwin':
 				session_1_command = 'dtruss -f -p ' + str(main_session.pid)
@@ -308,22 +326,30 @@ class PexpectSessionManager(object):
 				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			session_1_command = self.replace_pid(session_1_command, str(main_session.pid))
-		session_1 = PexpectSession(session_1_command,self,1)
+		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left')
 		if session_2_command is None:
-			session_1.set_position(0,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+			# Two panes only
+			if vertically_split:
+				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+			else:
+				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 		else:
-			session_1.set_position(0,self.wheight_bottom_start,self.wwidth_left_end,self.wheight-1)
+			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			session_2_command = self.replace_pid(session_2_command, str(main_session.pid))
-			session_2 = PexpectSession(session_2_command,self,2)
-			session_2.set_position(self.wwidth_right_start,self.wheight_bottom_start,self.wwidth,self.wheight-1)
+			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right')
+			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
-		# Set up any other sessions to be set up.
+		# Set up any other sessions to be set up with no panes.
 		count = 0
 		for other_command in remaining_commands:
 			other_command = self.replace_pid(other_command, str(main_session.pid))
-			other_session = PexpectSession(other_command, self, str(count))
-			other_session.set_position(0,0,0,0)
+			other_session = PexpectSession(other_command, self, count)
 			count += 1
+		# DEBUG
+		debug_msg(self)
+		for session in self.pexpect_sessions:
+			if session.session_pane:
+				debug_msg(session.session_pane)
 
 
 	def replace_pid(self, string, pid_str):
@@ -357,8 +383,7 @@ class PexpectSessionManager(object):
 
 class PexpectSession(object):
 
-
-	def __init__(self,command, pexpect_session_manager, session_number, encoding='utf-8'):
+	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, encoding='utf-8'):
 		self.pexpect_session         = None
 		self.session_number          = session_number
 		self.command                 = command
@@ -372,9 +397,13 @@ class PexpectSession(object):
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
-		self.top_left                = (-1,-1)
-		self.bottom_right            = (-1,-1)
-
+		if pane_name:
+			self.session_pane            = SessionPane(pane_name)
+			self.session_pane.top_left   = (-1,-1)
+			self.session_pane.bottom_right            = (-1,-1)
+		else:
+			self.session_pane            = None
+		assert isinstance(self.session_number, int)
 
 	def __str__(self):
 		string = ''
@@ -383,20 +412,15 @@ class PexpectSession(object):
 		string += '\npid: ' + str(self.pid)
 		return string
 
-
 	def spawn(self):
 		self.pexpect_session         = pexpect.spawn(self.command)
 		self.pid                     = self.pexpect_session.pid
 		if self.session_number == 0:
 			pexpect.run('kill -STOP ' + str(self.pid))
 
-
-
-
 	def write_to_logfile(self, msg):
 		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
-
 
 	def read_line(self,timeout=0.1):
 		if not self.pexpect_session:
@@ -420,7 +444,6 @@ class PexpectSession(object):
 			return True
 		return False
 
-
 	def wrap_output(self, width):
 		lines = self.output.split('\r\n')
 		lines_new = []
@@ -432,15 +455,9 @@ class PexpectSession(object):
 		self.output = '\r\n'.join(lines_new)
 		return True
 
-
 	def get_lines(self,width):
 		self.wrap_output(width)
 		return self.output.split('\r\n')
-
-	# TODO: move this functionality into sessionpane
-	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
-		self.top_left     = (top_left_x, top_left_y)
-		self.bottom_right = (bottom_right_x, bottom_right_y)
 
 
 # Represents a pane with no concept of context or content.
@@ -448,37 +465,64 @@ class SessionPane(object):
 
 	def __init__(self, name):
 		self.name                    = name
-		self.top_left                = (-1,-1)
-		self.bottom_right            = (-1,-1)
+		self.top_left_x              = -1
+		self.top_left_y              = -1
+		self.bottom_right_x          = -1
+		self.bottom_right_y          = -1
 
 	def __str__(self):
 		string = ''
-		string += '\ntop_left: ' + str(self.top_left)
-		string += '\nbottom_right: ' + str(self.bottom_right)
+		string += '\nname: '           + str(self.name)
+		string += '\ntop_left_x: '     + str(self.top_left_x)
+		string += '\ntop_left_y: '     + str(self.top_left_y)
+		string += '\nbottom_right_x: ' + str(self.bottom_right_x)
+		string += '\nbottom_right_y: ' + str(self.bottom_right_y)
+		string += '\nwidth: '          + str(self.get_width())
 		return string
 
 	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
-		self.top_left     = (top_left_x, top_left_y)
-		self.bottom_right = (bottom_right_x, bottom_right_y)
+		self.top_left_x     = top_left_x
+		self.top_left_y     = top_left_y
+		self.bottom_right_x = bottom_right_x
+		self.bottom_right_y = bottom_right_y
+
+	def get_width(self):
+		return self.bottom_right_x - self.top_left_x
 
 
 def process_args():
 	parser = argparse.ArgumentParser(description='Analyse a process in real time.')
-	parser.add_argument('commands', type=str, nargs='?', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
+	parser.add_argument('commands', type=str, nargs='*', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
-	parser.add_argument('-v', default=None, help='Split vertically rather than horizontally.')
+	parser.add_argument('-v', action='store_const', const=True, default=None, help='Split vertically rather than horizontally (the default).')
+	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
 	parser.add_argument('--replayfile', help='Replay output of an individual file')
 	args = parser.parse_args()
 	# Validate BEGIN
 	if args.commands is None and args.replayfile is None:
 		print('You must supply either a command or a replayfile')
 		parser.print_help(sys.stdout)
-		sys.ext(1)
+		sys.exit(1)
 	if isinstance(args.commands,str):
 		args.commands = [args.commands]
+	if args.v and len(args.commands) > 2:
+		print('-v and more than two commands supplied. -v does not make sense, so dropping that arg.')
+		args.v = False
+		time.sleep(1)
+	if args.d:
+		global debug
+		debug = True
 	# Validate DONE
+	debug_msg(args,0.5)
 	return args
 
+
+def debug_msg(msg,pause=None):
+	global debug
+	if debug:
+		print(msg)
+	if pause:
+		time.sleep(pause)
 
 def main():
 	args = process_args()
@@ -489,10 +533,9 @@ def main():
 		# TODO: separate out and determine pane layout
 		# TODO: panes then get assigned to sessions before drawing. The
 		#       relationship will be that the session will be assigned to at most 1 pane (or None).
-		pexpect_session_manager.setup_commands(args)
+		pexpect_session_manager.initialize_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
-			print(session)
 			if session.session_number == 0:
 				main_command_session = session
 			else:
@@ -502,8 +545,11 @@ def main():
 		while True:
 			try:
 				while True:
+					debug_msg('About to draw screen')
 					pexpect_session_manager.draw_screen('sessions')
+					debug_msg('About to handle_sessions')
 					pexpect_session_manager.handle_sessions()
+					debug_msg('About to handle_input')
 					pexpect_session_manager.handle_input()
 			except KeyboardInterrupt:
 				pexpect_session_manager.refresh_window()
@@ -511,8 +557,7 @@ def main():
 		print('Should not get here 1')
 		assert False
 
-
+debug = False
 autotrace_version='0.0.8'
-
 if __name__ == '__main__':
 	main()
