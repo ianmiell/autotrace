@@ -12,7 +12,7 @@ from curtsies.input import Input
 
 # TODO: implement help
 # TODO: toggle for showing commands in panes, highlight
-# TODO: default to 'strace the last thing you ran'?
+# TODO: default to 'strace the last thing you ran'? ps aux --sort +start_time | tail -n 4 | awk 'NR==1{print $2}'
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -24,14 +24,12 @@ from curtsies.input import Input
 #           - should the first line of the logfile be the command name?
 
 class PexpectSessionManager(object):
-
+	# Singleton
 	only_one = None
-
 	def __init__(self, logdir=None, debug=False):
-		# Singleton
 		assert self.only_one is None
-		self.debug                = debug
 		self.only_one             = True
+		self.debug                = debug
 		self.pexpect_sessions     = []
 		self.status               = 'Running'
 		self.main_command_session = None
@@ -151,13 +149,6 @@ class PexpectSessionManager(object):
 			# We're done, now render.
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
-	def draw_help(self):
-		help_text_lines = ['Placeholder text',]
-		i=2
-		for line in help_text_lines:
-			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
-			i += 1
-
 	def draw_sessions(self):
 		# Gather sessions
 		main_command_session, session_3, session_1, session_2 = (None,)*4
@@ -180,12 +171,8 @@ class PexpectSessionManager(object):
 		# Main session
 		if main_command_session.output != '':
 			pane = main_command_session.session_pane
-			lines = main_command_session.get_lines(pane.get_width())
-			if session_3:
-				lines = main_command_session.get_lines(self.wwidth_left_end)
-			else:
-				lines = main_command_session.get_lines(self.wwidth)
-			# Split the lines by newline, then reversed and zip up with line 2 to halfway.
+			pane_width = pane.get_width()
+			lines = main_command_session.get_lines(pane_width)
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
 				self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [green(line)]
 		if session_3 and session_3.output != '':
@@ -196,8 +183,6 @@ class PexpectSessionManager(object):
 
 		# Main tracer
 		if session_1.output != '':
-			#lines = session_1.get_lines(self.wwidth_left_end)
-			#pane = session_1.session_pane
 			pane = session_1.session_pane
 			lines = session_1.get_lines(pane.get_width())
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
@@ -208,6 +193,13 @@ class PexpectSessionManager(object):
 				lines = session_2.get_lines(pane.get_width())
 				for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
 					self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
+
+	def draw_help(self):
+		help_text_lines = ['Placeholder text',]
+		i=2
+		for line in help_text_lines:
+			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
+			i += 1
 
 	def quit_autotrace(self, msg='All done.'):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
@@ -316,7 +308,7 @@ class PexpectSessionManager(object):
 			session_1_command = replace_pid(session_1_command, str(main_session.pid))
 		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left')
 		if session_2_command is None:
-			# Two panes only
+			# Two panes only
 			if vertically_split:
 				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 			else:
@@ -332,7 +324,7 @@ class PexpectSessionManager(object):
 		for other_command in remaining_commands:
 			other_command = replace_pid(other_command, str(main_session.pid))
 			other_session = PexpectSession(other_command, self, count)
-			pexpect_session_manager.pexpect_sessions.append(other_session)
+			self.pexpect_sessions.append(other_session)
 			count += 1
 
 
@@ -457,7 +449,7 @@ class PexpectSession(object):
 		return self.output.split('\r\n')
 
 
-# Represents a pane with no concept of context or content.
+# Represents a pane with no concept of context or content.
 class SessionPane(object):
 
 	def __init__(self, name):
