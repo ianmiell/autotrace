@@ -12,6 +12,11 @@ import curtsies
 from curtsies.fmtfuncs import blue, red, green
 from curtsies.input import Input
 
+debug = False
+
+# TODO: cycle windows
+# TODO: session 3 covering up main?
+
 # TODO: implement help
 # TODO: debug mode where screen is not drawn
 # TODO: toggle for showing commands in panes, highlight
@@ -64,7 +69,6 @@ class PexpectSessionManager(object):
 		string += '\nwwidth: ' + str(self.wwidth)
 		return string
 
-
 	def refresh_window(self):
 		self.window               = curtsies.FullscreenWindow()
 		self.screen_arr           = None
@@ -78,14 +82,15 @@ class PexpectSessionManager(object):
 		assert self.wheight >= 24, self.quit_autotrace('Terminal not tall enough!')
 		assert self.wwidth >= 80, self.quit_autotrace('Terminal not wide enough!')
 
-
 	def write_to_logfile(self, msg):
 		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
-
 	def cycle_panes(self):
 		# Must have more than 4 panes to do a cycle (including main command)
+		for session in self.pexpect_sessions:
+			print(session)
+		sys.exit(1)
 		num_sessions = len(self.pexpect_sessions)
 		if num_sessions <= 4:
 			return False
@@ -119,7 +124,6 @@ class PexpectSessionManager(object):
 				else:
 					session.session_number = str(session_number - 1)
 
-
 	def get_number_of_sessions(self):
 		max_session_number = 0
 		reserved_list = (3,2,1,0)
@@ -127,7 +131,6 @@ class PexpectSessionManager(object):
 			if session.session_number not in reserved_list and max_session_number < session.session_number:
 				max_session_number = session.session_number
 		return max_session_number, max_session_number + len(reserved_list)
-
 
 	def draw_screen(self, draw_type):
 		assert draw_type in ('sessions','help')
@@ -149,12 +152,10 @@ class PexpectSessionManager(object):
 			self.draw_sessions(self.screen_arr)
 		elif draw_type == 'help':
 			self.draw_help(self.screen_arr)
-
 		global debug
 		if not debug:
 			# We're done, now render.
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
-
 
 	def draw_help(self, screen_arr):
 		help_text_lines = ['Placeholder text',]
@@ -162,7 +163,6 @@ class PexpectSessionManager(object):
 		for line in help_text_lines:
 			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
 			i += 1
-		
 
 	def draw_sessions(self, screen_arr):
 		# Gather sessions
@@ -217,7 +217,6 @@ class PexpectSessionManager(object):
 				for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
 					self.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [red(line)]
 
-
 	def quit_autotrace(self, msg='All done.'):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
@@ -229,7 +228,6 @@ class PexpectSessionManager(object):
 		print(msg)
 		sys.exit(0)
 
-
 	def handle_sessions(self):
 		seen_output = False
 		while not seen_output:
@@ -237,7 +235,7 @@ class PexpectSessionManager(object):
 				#debug_msg('In handle_sessions: session: ' + str(session))
 				if session.read_line():
 					seen_output = True
-
+		#self.debug_screen_array(self.screen_arr)
 
 	def handle_input(self):
 		with Input() as input_generator:
@@ -312,7 +310,7 @@ class PexpectSessionManager(object):
 				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 		else:
 			# At least 3 sessions
-			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.height_bottom_start-1)
+			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
 			# Session 3 setup
 			session_3_command = self.replace_pid(session_3_command, str(main_session.pid))
 			session_3 = PexpectSession(session_3_command, self, 3, 'top_right')
@@ -340,7 +338,7 @@ class PexpectSessionManager(object):
 			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 		# Set up any other sessions to be set up with no panes.
-		count = 0
+		count = 4
 		for other_command in remaining_commands:
 			other_command = self.replace_pid(other_command, str(main_session.pid))
 			other_session = PexpectSession(other_command, self, count)
@@ -374,9 +372,30 @@ class PexpectSessionManager(object):
 			if session.session_number == 0:
 				pexpect.run('kill -CONT ' + str(session.pid))
 
-
 	def get_elapsed_time_str(self):
 		return str(time.time() - self.start_time)
+
+	def debug_screen_array(self, screen_arr):
+		x, y = 0, 0
+		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY============')
+		self.pexpect_sessions[0].write_to_logfile('height: ' + str(screen_arr.height))
+		self.pexpect_sessions[0].write_to_logfile('width: ' + str(screen_arr.width))
+		while y < screen_arr.height:
+			line = ''
+			while x < screen_arr.width:
+				c=screen_arr[x,y]
+				if isinstance(c,str) and ord(c) < 128:
+					if c == ' ':
+						line += '.'
+					else:
+						line += c
+				else:
+					pass
+				x += 1
+			self.pexpect_sessions[0].write_to_logfile('line: ' + str(y) + line)
+			y += 1
+		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
+
 
 
 
@@ -557,7 +576,6 @@ def main():
 		print('Should not get here 1')
 		assert False
 
-debug = False
 autotrace_version='0.0.8'
 if __name__ == '__main__':
 	main()
