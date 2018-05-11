@@ -93,7 +93,7 @@ class PexpectSessionManager(object):
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
 		max_session_number, _ = self.get_number_of_sessions()
 		for session in self.pexpect_sessions:
-			if session.session_number not in (3,2,1,0) and max_session_number < int(session.name):
+			if session.session_number not in (3,2,1,0) and max_session_number < session.session_number:
 				max_session_number = session.session_number
 		assert max_session_number > 0
 		for session in self.pexpect_sessions:
@@ -102,17 +102,17 @@ class PexpectSessionManager(object):
 			elif session.session_number == 2:
 				session.session_number = 1
 			elif session.session_number == 1:
-				session.session_number = str(max_session_number)
+				session.session_number = max_session_number
 			elif session.session_number == 0:
 				# Do nothing - this does not get touched
 				pass
 			else:
-				assert isinstance(session.session_number, int), 'Broken session number: ' + session.session_number
+				assert isinstance(session.session_number, int), 'Broken session number, type: ' + str(type(session.session_number)) + ' ' + session.session_number
 				session_number = session.session_number
 				if session_number == 1:
 					session.session_number = 3
 				else:
-					session.session_number = str(session_number - 1)
+					session.session_number = session_number - 1
 
 	def get_number_of_sessions(self):
 		max_session_number = 0
