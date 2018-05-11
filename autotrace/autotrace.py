@@ -496,7 +496,7 @@ def process_args():
 	parser.add_argument('--replayfile', help='Replay output of an individual file')
 	args = parser.parse_args()
 	# Validate BEGIN
-	if args.commands is None and args.replayfile is None:
+	if args.commands == [] and args.replayfile is None:
 		print('You must supply either a command or a replayfile')
 		parser.print_help(sys.stdout)
 		sys.exit(1)
@@ -537,9 +537,6 @@ def main():
 					pexpect_session_manager.handle_input()
 			except KeyboardInterrupt:
 				pexpect_session_manager.refresh_window()
-	else:
-		print('Should not get here 1')
-		assert False
 
 
 autotrace_version='0.0.8'
