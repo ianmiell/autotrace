@@ -33,6 +33,7 @@ class PexpectSessionManager(object):
 		self.debug                = debug
 		self.pexpect_sessions     = []
 		self.status               = 'Running'
+		self.status_message       = ''
 		self.main_command_session = None
 		self.pid                  = os.getpid()
 		if logdir is not None:
@@ -116,7 +117,7 @@ class PexpectSessionManager(object):
 		assert draw_type in ('sessions','help')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
-		header_text = 'autotrace running...'
+		header_text = 'autotrace running... ' + self.status_message
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
 		_, number_of_sessions = self.get_number_of_sessions()
@@ -162,8 +163,9 @@ class PexpectSessionManager(object):
 					seen_output = True
 
 	def handle_input(self):
+		# TODO: handle help message here as opportunities vary
 		with Input() as input_generator:
-			input_char = input_generator.send(.01)
+			input_char = input_generator.send(.000001)
 			if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'p',):
@@ -179,9 +181,13 @@ class PexpectSessionManager(object):
 					elif e == 'q':
 						self.quit_autotrace()
 					elif e == 'b':
-						self.scroll_back()
+						msg = self.scroll_back()
+						self.status_message = 'just hit back'
+						self.draw_screen('sessions')
 					elif e == 'f':
-						self.scroll_forward()
+						msg = self.scroll_forward()
+						self.status_message = 'just hit forward'
+						self.draw_screen('sessions')
 			elif input_char == 'q':
 				self.quit_autotrace()
 			elif input_char in (u'm',):
@@ -318,18 +324,35 @@ class PexpectSessionManager(object):
 		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
 
 	def scroll_back(self):
-		# TODO: rewrite display of pane to write back up from the bottom (does it do that already? I think it does)
 		# for each session:
 			# take the pointer, and move back n lines, where n is the height of the pane. if less than zero, do nothing
 			# re-display
-		pass
+		# TODO calculate visual height based on line splitting instead of number of lines.
+		return_msg = ''
+		for session in self.pexpect_sessions:
+			if session.session_pane:
+				height = session.session_pane.get_height()
+				if session.output_lines_pointer - height >= 0:
+					session.output_lines_pointer -= height
+				else:
+					session.output_lines_pointer = 0
+					return_msg = '... at least one session all the way back'
+		return return_msg
 
 	def scroll_forward(self):
-		# TODO: rewrite display of pane to write back up from the bottom (does it do that already? I think it does)
 		# for each session:
 			# take the pointer, and move forward n lines, where n is the height of the pane. if greater than length, do nothing
 			# re-display
-		pass
+		# TODO calculate visual height based on line splitting instead of number of lines.
+		return_msg = ''
+		for session in self.pexpect_sessions:
+			if session.session_pane:
+				height = session.session_pane.get_height()
+				if session.output_lines_pointer + height <= len(session.output_lines) - 1:
+					session.output_lines_pointer += height
+				else:
+					session.output_lines_pointer = len(session.output_lines) - 1
+		return ''
 
 
 class PexpectSession(object):
@@ -340,6 +363,8 @@ class PexpectSession(object):
 		self.command                 = command
 		self.output_lines            = []
 		self.output_lines_pointer    = -1
+		# Pointer to the uppermost-visible PexpectSessionLine in this pane TODO: make get_lines record this, and use it for scrolling
+		self.output_top_visible_line = None
 		self.pid                     = -1
 		self.encoding                = encoding
 		self.pexpect_session_manager = pexpect_session_manager
@@ -350,12 +375,11 @@ class PexpectSession(object):
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
+		self.session_pane            = None
 		if pane_name:
 			self.session_pane            = SessionPane(pane_name, pane_color)
 			self.session_pane.top_left   = (-1,-1)
 			self.session_pane.bottom_right            = (-1,-1)
-		else:
-			self.session_pane            = None
 		assert isinstance(self.session_number, int)
 
 	def __str__(self):
@@ -382,7 +406,7 @@ class PexpectSession(object):
 		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
-	def read_line(self,timeout=0.1):
+	def read_line(self,timeout=0.00001):
 		if not self.pexpect_session:
 			return False
 		string = None
@@ -460,6 +484,7 @@ class SessionPane(object):
 		string += '\nbottom_right_x: ' + str(self.bottom_right_x)
 		string += '\nbottom_right_y: ' + str(self.bottom_right_y)
 		string += '\nwidth: '          + str(self.get_width())
+		string += '\nheight: '          + str(self.get_width())
 		return string
 
 	def set_position(self, top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -470,6 +495,9 @@ class SessionPane(object):
 
 	def get_width(self):
 		return self.bottom_right_x - self.top_left_x
+
+	def get_height(self):
+		return self.bottom_right_y - self.top_left_y
 
 
 def process_args():
