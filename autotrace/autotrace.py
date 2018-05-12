@@ -221,11 +221,12 @@ class PexpectSessionManager(object):
 			session_3_command    = args.commands[3]
 		remaining_commands = args.commands[3:]
 		vertically_split = args.v
+		logtimestep      = args.logtimestep
 		assert not args.v or session_2_command is None, 'BUG! Vertical arg should be off at this point if session_2 exists'
 		args = None
 
 		# Main command setup
-		main_session = PexpectSession(main_command, self, 0, pane_name='top_left', pane_color=green)
+		main_session = PexpectSession(main_command, self, 0, pane_name='top_left', pane_color=green, logtimestep=logtimestep)
 		main_session.spawn()
 		if session_3_command is None:
 			if vertically_split:
@@ -237,7 +238,7 @@ class PexpectSessionManager(object):
 			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
 			# Session 3 setup
 			session_3_command = replace_pid(session_3_command, str(main_session.pid))
-			session_3 = PexpectSession(session_3_command, self, 3, 'top_right')
+			session_3 = PexpectSession(session_3_command, self, 3, 'top_right', logtimestep=logtimestep)
 			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 		# Session 1 setup
 		# Default tracer is a syscall tracer
@@ -248,7 +249,7 @@ class PexpectSessionManager(object):
 				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			session_1_command = replace_pid(session_1_command, str(main_session.pid))
-		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left')
+		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left', logtimestep=logtimestep)
 		if session_2_command is None:
 			# Two panes only
 			if vertically_split:
@@ -258,14 +259,14 @@ class PexpectSessionManager(object):
 		else:
 			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			session_2_command = replace_pid(session_2_command, str(main_session.pid))
-			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right')
+			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right', logtimestep=logtimestep)
 			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 		# Set up any other sessions to be set up with no panes.
 		count = 4
 		for other_command in remaining_commands:
 			other_command = replace_pid(other_command, str(main_session.pid))
-			other_session = PexpectSession(other_command, self, count)
+			other_session = PexpectSession(other_command, self, count, logtimestep=logtimestep)
 			self.pexpect_sessions.append(other_session)
 			count += 1
 
@@ -315,7 +316,7 @@ class PexpectSessionManager(object):
 
 class PexpectSession(object):
 
-	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, pane_color=red, encoding='utf-8'):
+	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, pane_color=red, encoding='utf-8', logtimestep=False):
 		self.pexpect_session         = None
 		self.session_number          = session_number
 		self.command                 = command
@@ -325,6 +326,7 @@ class PexpectSession(object):
 		self.pexpect_session_manager = pexpect_session_manager
 		self.logfilename             = pexpect_session_manager.logdir + '/' + str(self.session_number) + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
 		self.logfile                 = open(self.logfilename,'w+')
+		self.logtimestep             = logtimestep
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.session_number == 0:
@@ -379,7 +381,7 @@ class PexpectSession(object):
 			self.pexpect_session_manager.write_to_logfile(eg)
 		if string:
 			self.write_to_logfile(string.strip())
-			self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time()))
+			self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), 'program_output'))
 			return True
 		return False
 
@@ -387,7 +389,12 @@ class PexpectSession(object):
 		assert self.session_pane
 		width = self.session_pane.get_width()
 		lines_new = []
+		last_time_seen = -1
 		for line_obj in self.output_lines:
+			if self.logtimestep:
+				if int(line_obj.time_seen) > last_time_seen:
+					lines_new.append('AutotraceTime:' + str(int(line_obj.time_seen)))
+				last_time_seen = int(line_obj.time_seen)
 			# Remove newline
 			line = line_obj.line_str.strip()
 			while len(line) > width-1:
@@ -399,9 +406,11 @@ class PexpectSession(object):
 
 # Represents a line in the array of output
 class PexpectSessionLine(object):
-	def __init__(self, line_str, time_seen):
-		self.line_str  = line_str
-		self.time_seen = time_seen
+	def __init__(self, line_str, time_seen, line_type):
+		self.line_str          = line_str
+		self.time_seen         = time_seen
+		self.line_type         = line_type
+		assert self.line_type in ('program_output',)
 
 
 # Represents a pane with no concept of context or content.
@@ -442,6 +451,7 @@ def process_args():
 	parser.add_argument('-v', action='store_const', const=True, default=None, help='Split vertically rather than horizontally (the default).')
 	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
 	parser.add_argument('--replayfile', help='Replay output of an individual file')
+	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
 	if args.commands == [] and args.replayfile is None:
