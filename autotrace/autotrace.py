@@ -318,9 +318,17 @@ class PexpectSessionManager(object):
 		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
 
 	def scroll_back(self):
+		# TODO: rewrite display of pane to write back up from the bottom (does it do that already? I think it does)
+		# for each session:
+			# take the pointer, and move back n lines, where n is the height of the pane. if less than zero, do nothing
+			# re-display
 		pass
 
 	def scroll_forward(self):
+		# TODO: rewrite display of pane to write back up from the bottom (does it do that already? I think it does)
+		# for each session:
+			# take the pointer, and move forward n lines, where n is the height of the pane. if greater than length, do nothing
+			# re-display
 		pass
 
 
@@ -401,6 +409,7 @@ class PexpectSession(object):
 		self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), line_type))
 
 	def get_lines(self):
+		# TODO: get lines up to the output_lines_pointer
 		assert self.session_pane
 		width = self.session_pane.get_width()
 		lines_new = []
