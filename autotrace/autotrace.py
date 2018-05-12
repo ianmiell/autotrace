@@ -330,10 +330,10 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				height = session.session_pane.get_height()
-				if session.output_lines_pointer - height >= 0:
-					session.output_lines_pointer -= height
+				if session.output_lines_end_pane_pointer - height >= 0:
+					session.output_lines_end_pane_pointer -= height
 				else:
-					session.output_lines_pointer = 0
+					session.output_lines_end_pane_pointer = 0
 					return_msg = '... at least one session all the way back'
 		return return_msg
 
@@ -343,10 +343,10 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				height = session.session_pane.get_height()
-				if session.output_lines_pointer + height <= len(session.output_lines) - 1:
-					session.output_lines_pointer += height
+				if session.output_lines_end_pane_pointer + height <= len(session.output_lines) - 1:
+					session.output_lines_end_pane_pointer += height
 				else:
-					session.output_lines_pointer = len(session.output_lines) - 1
+					session.output_lines_end_pane_pointer = len(session.output_lines) - 1
 		return return_msg
 
 
@@ -357,7 +357,7 @@ class PexpectSession(object):
 		self.session_number          = session_number
 		self.command                 = command
 		self.output_lines            = []
-		self.output_lines_pointer    = -1
+		self.output_lines_end_pane_pointer    = -1
 		# Pointer to the uppermost-visible PexpectSessionLine in this pane TODO: make get_lines record this, and use it for scrolling
 		self.output_top_visible_line = None
 		self.pid                     = -1
@@ -391,24 +391,24 @@ class PexpectSession(object):
 			width = self.session_pane.get_width()
 			lines_in_pane_str_arr = []
 			last_time_seen = -1
-			line_count = -1
+			output_lines_index = -1
 			for line_obj in self.output_lines:
-				line_count = line_count + 1
+				output_lines_index += 1
 				# If we go past the output line pointer, then break - we don't want to see any later lines.
-				if line_count > self.output_lines_pointer:
+				if output_lines_index > self.output_lines_end_pane_pointer:
 					break
 				if self.logtimestep:
 					if int(line_obj.time_seen) > last_time_seen:
-						lines_in_pane_str_arr.append('AutotraceTime:' + str(int(line_obj.time_seen)))
+						lines_in_pane_str_arr.append(['AutotraceTime:' + str(int(line_obj.time_seen)), output_lines_index])
 					last_time_seen = int(line_obj.time_seen)
 				# Strip newline
 				line = line_obj.line_str.strip()
 				while len(line) > width-1:
-					lines_in_pane_str_arr.append(line[:width-1])
+					lines_in_pane_str_arr.append([line[:width-1], output_lines_index])
 					line = line[width-1:]
-				lines_in_pane_str_arr.append(line)
+				lines_in_pane_str_arr.append([line, output_lines_index])
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
-				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [pane.color(line)]
+				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line[0])] = [pane.color(line[0])]
 
 
 	def spawn(self):
@@ -445,7 +445,7 @@ class PexpectSession(object):
 		return False
 
 	def append_output_line(self, string, line_type):
-		self.output_lines_pointer += 1
+		self.output_lines_end_pane_pointer += 1
 		self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), line_type))
 
 
