@@ -12,7 +12,7 @@ from curtsies.input import Input
 
 # TODO: implement help
 # TODO: toggle for showing commands in panes, highlight
-# TODO: default to 'strace the last thing you ran'? ps aux --sort +start_time | tail -n 4 | awk 'NR==1{print $2}'
+# TODO: default to 'strace the last thing you ran'? ps -o pid=,lstart=
 # TODO: stop elapsed time on pause
 # TODO: replay function?
 #       - add in timer to synchonise time
@@ -178,6 +178,10 @@ class PexpectSessionManager(object):
 						break
 					elif e == 'q':
 						self.quit_autotrace()
+					elif e == 'b':
+						self.scroll_back()
+					elif e == 'f':
+						self.scroll_forward()
 			elif input_char == 'q':
 				self.quit_autotrace()
 			elif input_char in (u'm',):
@@ -313,6 +317,12 @@ class PexpectSessionManager(object):
 			y += 1
 		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
 
+	def scroll_back(self):
+		pass
+
+	def scroll_forward(self):
+		pass
+
 
 class PexpectSession(object):
 
@@ -321,6 +331,7 @@ class PexpectSession(object):
 		self.session_number          = session_number
 		self.command                 = command
 		self.output_lines            = []
+		self.output_lines_pointer    = -1
 		self.pid                     = -1
 		self.encoding                = encoding
 		self.pexpect_session_manager = pexpect_session_manager
@@ -381,9 +392,13 @@ class PexpectSession(object):
 			self.pexpect_session_manager.write_to_logfile(eg)
 		if string:
 			self.write_to_logfile(string.strip())
-			self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), 'program_output'))
+			self.append_output_line(string, 'program_output')
 			return True
 		return False
+
+	def append_output_line(string, line_type):
+		self.output_lines_pointer += 1
+		self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), line_type))
 
 	def get_lines(self):
 		assert self.session_pane
