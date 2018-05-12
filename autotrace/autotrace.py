@@ -386,9 +386,9 @@ class PexpectSession(object):
 
 
 	def get_lines(self,width):
-		lines = self.output.split('\r\n')
 		lines_new = []
-		for line in lines:
+		for line_obj in self.output_lines:
+			line = line_obj.line_str
 			while len(line) > width-1:
 				lines_new.append(line[:width-1])
 				line = line[width-1:]
