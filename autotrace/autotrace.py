@@ -329,8 +329,10 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				# TODO: edge cases - already zero?
-				session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
+				if session.output_lines_end_pane_pointer > 0:
+					session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
+				else:
+					return_msg = ' at least one session has hit the top'
 		return return_msg
 
 	def scroll_forward(self):
@@ -338,8 +340,10 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				# TODO: edge cases - already zero at end?
-				session.output_lines_end_pane_pointer = session.output_top_visible_line_index+1
+				if session.output_lines_end_pane_pointer < len(session.output_lines):
+					session.output_lines_end_pane_pointer = session.output_top_visible_line_index+1
+				else:
+					return_msg = ' at least one session has hit the end' 
 		return return_msg
 
 
@@ -351,7 +355,7 @@ class PexpectSession(object):
 		self.command                       = command
 		self.output_lines                  = []
 		self.output_lines_end_pane_pointer = -1
-		# Pointer to the uppermost-visible PexpectSessionLine in this pane TODO: make get_lines record this, and use it for scrolling
+		# Pointer to the uppermost-visible PexpectSessionLine in this pane
 		self.output_top_visible_line_index = None
 		self.pid                           = -1
 		self.encoding                      = encoding
@@ -375,6 +379,9 @@ class PexpectSession(object):
 		string += '\nsession_number: ' + str(self.session_number)
 		string += '\ncommand: ' + str(self.command)
 		string += '\npid: ' + str(self.pid)
+		string += '\noutput_lines length: ' + str(len(self.output_lines_end_pane_pointer))
+		string += '\noutput_lines_end_pane_pointer: ' + str(self.output_lines_end_pane_pointer)
+		string += '\noutput_top_visible_line_index: ' + str(self.output_top_visible_line_index)
 		return string
 
 	def write_out_session_to_fit_pane(self):
