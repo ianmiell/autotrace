@@ -384,19 +384,19 @@ class PexpectSession(object):
 			return True
 		return False
 
-
 	def get_lines(self,width):
 		lines_new = []
 		for line_obj in self.output_lines:
-			line = line_obj.line_str
+			# Remove newline
+			line = line_obj.line_str.strip()
 			while len(line) > width-1:
 				lines_new.append(line[:width-1])
 				line = line[width-1:]
 			lines_new.append(line)
-		self.output = '\r\n'.join(lines_new)
-		return self.output.split('\r\n')
+		return lines_new
 
 
+# Represents a line in the array of output
 class PexpectSessionLine(object):
 	def __init__(self, line_str, time_seen):
 		self.line_str  = line_str
