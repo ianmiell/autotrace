@@ -353,28 +353,28 @@ class PexpectSessionManager(object):
 class PexpectSession(object):
 
 	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, pane_color=red, encoding='utf-8', logtimestep=False):
-		self.pexpect_session         = None
-		self.session_number          = session_number
-		self.command                 = command
-		self.output_lines            = []
-		self.output_lines_end_pane_pointer    = -1
+		self.pexpect_session               = None
+		self.session_number                = session_number
+		self.command                       = command
+		self.output_lines                  = []
+		self.output_lines_end_pane_pointer = -1
 		# Pointer to the uppermost-visible PexpectSessionLine in this pane TODO: make get_lines record this, and use it for scrolling
-		self.output_top_visible_line = None
-		self.pid                     = -1
-		self.encoding                = encoding
-		self.pexpect_session_manager = pexpect_session_manager
-		self.logfilename             = pexpect_session_manager.logdir + '/' + str(self.session_number) + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
-		self.logfile                 = open(self.logfilename,'w+')
-		self.logtimestep             = logtimestep
+		self.output_top_visible_line       = None
+		self.pid                           = -1
+		self.encoding                      = encoding
+		self.pexpect_session_manager       = pexpect_session_manager
+		self.logfilename                   = pexpect_session_manager.logdir + '/' + str(self.session_number) + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
+		self.logfile                       = open(self.logfilename,'w+')
+		self.logtimestep                   = logtimestep
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
-		self.session_pane            = None
+		self.session_pane                  = None
 		if pane_name:
-			self.session_pane            = SessionPane(pane_name, pane_color)
-			self.session_pane.top_left   = (-1,-1)
-			self.session_pane.bottom_right            = (-1,-1)
+			self.session_pane              = SessionPane(pane_name, pane_color)
+			self.session_pane.top_left     = (-1,-1)
+			self.session_pane.bottom_right = (-1,-1)
 		assert isinstance(self.session_number, int)
 
 	def __str__(self):
@@ -409,6 +409,7 @@ class PexpectSession(object):
 				lines_in_pane_str_arr.append([line, output_lines_index])
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
 				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line[0])] = [pane.color(line[0])]
+				self.output_top_visible_line = line[1]
 
 
 	def spawn(self):
