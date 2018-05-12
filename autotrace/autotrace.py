@@ -132,7 +132,7 @@ class PexpectSessionManager(object):
 		# Draw the sessions.
 		if draw_type == 'sessions':
 			for session in self.pexpect_sessions:
-				session.write_out_session()
+				session.write_out_session_to_pane()
 		elif draw_type == 'help':
 			self.draw_help()
 		if not self.debug:
@@ -390,7 +390,7 @@ class PexpectSession(object):
 		string += '\npid: ' + str(self.pid)
 		return string
 
-	def write_out_session(self):
+	def write_out_session_to_pane(self):
 		pane = self.session_pane
 		if pane:
 			lines = self.get_lines()
