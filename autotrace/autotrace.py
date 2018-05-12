@@ -7,12 +7,13 @@ import sys
 import time
 import pexpect
 import curtsies
-from curtsies.fmtfuncs import blue, red, green
+from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, green, on_black, on_dark, on_red, on_green, on_yellow, on_blue, on_magenta, on_cyan, on_gray, bold, dark, underline, blink, invert, plain
 from curtsies.input import Input
 
 # TODO: implement help
 # TODO: toggle for showing commands in panes, highlight
 # TODO: default to 'strace the last thing you ran'? ps aux --sort +start_time | tail -n 4 | awk 'NR==1{print $2}'
+# TODO: stop elapsed time on pause
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -318,7 +319,6 @@ class PexpectSession(object):
 		self.pexpect_session         = None
 		self.session_number          = session_number
 		self.command                 = command
-		self.output                  = ''
 		self.output_lines            = []
 		self.pid                     = -1
 		self.encoding                = encoding
@@ -379,7 +379,6 @@ class PexpectSession(object):
 			self.pexpect_session_manager.write_to_logfile(eg)
 		if string:
 			self.write_to_logfile(string.strip())
-			self.output += string
 			self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time()))
 			return True
 		return False
