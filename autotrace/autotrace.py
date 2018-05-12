@@ -347,7 +347,7 @@ class PexpectSession(object):
 	def write_out_session(self):
 		pane = self.session_pane
 		if pane:
-			lines = self.get_lines(pane.get_width())
+			lines = self.get_lines()
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
 				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [pane.color(line)]
 
@@ -383,7 +383,9 @@ class PexpectSession(object):
 			return True
 		return False
 
-	def get_lines(self,width):
+	def get_lines(self):
+		assert self.session_pane
+		width = self.session_pane.get_width()
 		lines_new = []
 		for line_obj in self.output_lines:
 			# Remove newline
