@@ -183,11 +183,11 @@ class PexpectSessionManager(object):
 						self.quit_autotrace()
 					elif e == 'b':
 						msg = self.scroll_back()
-						self.status_message = 'just hit back'
+						self.status_message = 'you just hit back ' + msg
 						self.draw_screen('sessions')
 					elif e == 'f':
 						msg = self.scroll_forward()
-						self.status_message = 'just hit forward'
+						self.status_message = 'you just hit forward ' + msg
 						self.draw_screen('sessions')
 			elif input_char == 'q':
 				self.quit_autotrace()
@@ -325,8 +325,7 @@ class PexpectSessionManager(object):
 		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
 
 	def scroll_back(self):
-		# for each session:
-		# take the pointer, and move the _end_ pointer back to the output_top_visible_line_index - 1 and re-display
+		# for each session: take the pointer, and move the _end_ pointer back to the output_top_visible_line_index - 1 and re-display
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
@@ -339,9 +338,7 @@ class PexpectSessionManager(object):
 		return return_msg
 
 	def scroll_forward(self):
-		# for each session:
-			# take the pointer, and move forward n lines, where n is the height of the pane. if greater than length, do nothing
-			# re-display
+		# for each session: take the pointer, and move forward n lines, where n is the height of the pane. if greater than length, do nothing and re-display
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
@@ -392,7 +389,7 @@ class PexpectSession(object):
 		if pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
-			lines_new = []
+			lines_in_pane_str_arr = []
 			last_time_seen = -1
 			line_count = -1
 			for line_obj in self.output_lines:
@@ -402,16 +399,15 @@ class PexpectSession(object):
 					break
 				if self.logtimestep:
 					if int(line_obj.time_seen) > last_time_seen:
-						lines_new.append('AutotraceTime:' + str(int(line_obj.time_seen)))
+						lines_in_pane_str_arr.append('AutotraceTime:' + str(int(line_obj.time_seen)))
 					last_time_seen = int(line_obj.time_seen)
-				# Remove newline
+				# Strip newline
 				line = line_obj.line_str.strip()
 				while len(line) > width-1:
-					lines_new.append(line[:width-1])
+					lines_in_pane_str_arr.append(line[:width-1])
 					line = line[width-1:]
-				lines_new.append(line)
-			lines = lines_new
-			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines)):
+				lines_in_pane_str_arr.append(line)
+			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
 				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line)] = [pane.color(line)]
 
 
