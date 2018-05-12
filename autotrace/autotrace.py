@@ -329,12 +329,8 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				height = session.session_pane.get_height()
-				if session.output_lines_end_pane_pointer - height >= 0:
-					session.output_lines_end_pane_pointer -= height
-				else:
-					session.output_lines_end_pane_pointer = 0
-					return_msg = '... at least one session all the way back'
+				# TODO: edge cases - already zero?
+				session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
 		return return_msg
 
 	def scroll_forward(self):
@@ -342,11 +338,8 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				height = session.session_pane.get_height()
-				if session.output_lines_end_pane_pointer + height <= len(session.output_lines) - 1:
-					session.output_lines_end_pane_pointer += height
-				else:
-					session.output_lines_end_pane_pointer = len(session.output_lines) - 1
+				# TODO: edge cases - already zero at end?
+				session.output_lines_end_pane_pointer = session.output_top_visible_line_index+1
 		return return_msg
 
 
@@ -359,7 +352,7 @@ class PexpectSession(object):
 		self.output_lines                  = []
 		self.output_lines_end_pane_pointer = -1
 		# Pointer to the uppermost-visible PexpectSessionLine in this pane TODO: make get_lines record this, and use it for scrolling
-		self.output_top_visible_line       = None
+		self.output_top_visible_line_index = None
 		self.pid                           = -1
 		self.encoding                      = encoding
 		self.pexpect_session_manager       = pexpect_session_manager
@@ -409,12 +402,12 @@ class PexpectSession(object):
 				lines_in_pane_str_arr.append([line, output_lines_index])
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
 				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line[0])] = [pane.color(line[0])]
-				self.output_top_visible_line = line[1]
-
+				# Record the uppermost-visible line
+				self.output_top_visible_line_index = line[1]
 
 	def spawn(self):
-		self.pexpect_session         = pexpect.spawn(self.command)
-		self.pid                     = self.pexpect_session.pid
+		self.pexpect_session = pexpect.spawn(self.command)
+		self.pid             = self.pexpect_session.pid
 		if self.session_number == 0:
 			pexpect.run('kill -STOP ' + str(self.pid))
 
