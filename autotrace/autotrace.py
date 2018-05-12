@@ -404,17 +404,21 @@ class PexpectSession(object):
 			return True
 		return False
 
-	def append_output_line(string, line_type):
+	def append_output_line(self, string, line_type):
 		self.output_lines_pointer += 1
 		self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), line_type))
 
 	def get_lines(self):
-		# TODO: get lines up to the output_lines_pointer
 		assert self.session_pane
 		width = self.session_pane.get_width()
 		lines_new = []
 		last_time_seen = -1
+		line_count = -1
 		for line_obj in self.output_lines:
+			line_count = line_count + 1
+			# If we go past the output line pointer, then break - we don't want to see any later lines.
+			if line_count > self.output_lines_pointer:
+				break
 			if self.logtimestep:
 				if int(line_obj.time_seen) > last_time_seen:
 					lines_new.append('AutotraceTime:' + str(int(line_obj.time_seen)))
