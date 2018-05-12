@@ -36,6 +36,7 @@ class PexpectSessionManager(object):
 		self.status_message       = ''
 		self.main_command_session = None
 		self.pid                  = os.getpid()
+		self.timeout_delay        = 0.001
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -165,7 +166,7 @@ class PexpectSessionManager(object):
 	def handle_input(self):
 		# TODO: handle help message here as opportunities vary
 		with Input() as input_generator:
-			input_char = input_generator.send(.000001)
+			input_char = input_generator.send(self.timeout_delay)
 			if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'p',):
@@ -406,19 +407,20 @@ class PexpectSession(object):
 		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
-	def read_line(self,timeout=0.00001):
+	def read_line(self):
 		if not self.pexpect_session:
 			return False
 		string = None
 		try:
-			self.pexpect_session.expect('\r\n',timeout=timeout)
+			self.pexpect_session.expect('\r\n',timeout=self.pexpect_session_manager.timeout_delay)
 			string = self.pexpect_session.before.decode(self.encoding) + '\r\n'
 		except pexpect.EOF:
 			self.pexpect_session_manager.write_to_logfile('Command session: done ' + self.command)
 			self.pexpect_session = None
 		except pexpect.TIMEOUT:
-			# This is ok.
-			self.pexpect_session_manager.write_to_logfile('Timeout in command session: ' + self.command)
+			# This is ok. Not logged for perf reasons
+			#self.pexpect_session_manager.write_to_logfile('Timeout in command session: ' + self.command)
+			pass
 		except Exception as eg:
 			self.pexpect_session_manager.write_to_logfile('Error in command session: ' + self.command)
 			self.pexpect_session_manager.write_to_logfile(eg)
