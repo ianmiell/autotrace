@@ -286,6 +286,8 @@ class PexpectSessionManager(object):
 
 	def get_elapsed_time_str(self):
 		return str(time.time() - self.start_time)
+	def get_elapsed_time(self):
+		return time.time() - self.start_time
 
 	def debug_screen_array(self, screen_arr):
 		# TODO make this work?
@@ -317,6 +319,7 @@ class PexpectSession(object):
 		self.session_number          = session_number
 		self.command                 = command
 		self.output                  = ''
+		self.output_lines            = []
 		self.pid                     = -1
 		self.encoding                = encoding
 		self.pexpect_session_manager = pexpect_session_manager
@@ -340,7 +343,6 @@ class PexpectSession(object):
 		string += '\ncommand: ' + str(self.command)
 		string += '\npid: ' + str(self.pid)
 		return string
-
 
 	def write_out_session(self):
 		pane = self.session_pane
@@ -378,10 +380,12 @@ class PexpectSession(object):
 		if string:
 			self.write_to_logfile(string.strip())
 			self.output += string
+			self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time()))
 			return True
 		return False
 
-	def wrap_output(self, width):
+
+	def get_lines(self,width):
 		lines = self.output.split('\r\n')
 		lines_new = []
 		for line in lines:
@@ -390,11 +394,13 @@ class PexpectSession(object):
 				line = line[width-1:]
 			lines_new.append(line)
 		self.output = '\r\n'.join(lines_new)
-		return True
-
-	def get_lines(self,width):
-		self.wrap_output(width)
 		return self.output.split('\r\n')
+
+
+class PexpectSessionLine(object):
+	def __init__(self, line_str, time_seen):
+		self.line_str  = line_str
+		self.time_seen = time_seen
 
 
 # Represents a pane with no concept of context or content.
