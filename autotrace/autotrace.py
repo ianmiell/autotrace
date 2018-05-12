@@ -347,7 +347,7 @@ class PexpectSessionManager(object):
 					session.output_lines_pointer += height
 				else:
 					session.output_lines_pointer = len(session.output_lines) - 1
-		return ''
+		return return_msg
 
 
 class PexpectSession(object):
