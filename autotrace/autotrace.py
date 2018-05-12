@@ -340,8 +340,9 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
+				# TODO debug
 				if session.output_lines_end_pane_pointer < len(session.output_lines):
-					session.output_lines_end_pane_pointer = session.output_top_visible_line_index+1
+					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 				else:
 					return_msg = ' at least one session has hit the end' 
 		return return_msg
