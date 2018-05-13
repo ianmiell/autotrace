@@ -218,21 +218,21 @@ class PexpectSessionManager(object):
 	def initialize_commands(self, args):
 		num_commands = len(args.commands)
 		assert num_commands >= 1, self.quit_autotrace('Not enough commands! Must be at least two.')
-		session_1_command = None
-		session_2_command = None
-		session_3_command = None
-		main_command         = args.commands[0]
+		session_1_command     = None
+		session_2_command     = None
+		session_3_command     = None
+		main_command          = args.commands[0]
 		if num_commands > 1:
-			session_1_command  = args.commands[1]
+			session_1_command = args.commands[1]
 		else:
-			session_1_command  = None
+			session_1_command = None
 		if num_commands > 2:
 			session_2_command = args.commands[2]
 		if num_commands > 3:
-			session_3_command    = args.commands[3]
-		remaining_commands = args.commands[3:]
+			session_3_command = args.commands[3]
+		remaining_commands    = args.commands[3:]
 		self.vertically_split = args.v
-		logtimestep      = args.logtimestep
+		logtimestep           = args.logtimestep
 		assert not args.v or session_2_command is None, 'BUG! Vertical arg should be off at this point if session_2 exists'
 		args = None
 		# Args, collected, set up commands and sessions
@@ -265,9 +265,24 @@ class PexpectSessionManager(object):
 			other_session = PexpectSession(other_command, self, session_count, logtimestep=logtimestep)
 			self.pexpect_sessions.append(other_session)
 			session_count += 1
+		self.do_layout()
 
-		# TODO: abstract this so we can call it anytime
-		if session_3_command is None:
+	def do_layout(self):
+		main_session      = None
+		session_1         = None
+		session_2         = None
+		session_3         = None
+		for session in self.pexpect_sessions:
+			if session.session_number == 0:
+				main_session = session
+			elif session.session_number == 1:
+				session_1    = session
+			elif session.session_number == 2:
+				session_2    = session
+			elif session.session_number == 3:
+				session_3    = session
+		assert main_session is not None and session_1 is not None
+		if session_3 is None:
 			if self.vertically_split:
 				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			else:
@@ -277,7 +292,7 @@ class PexpectSessionManager(object):
 			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
 			# ... and then session 3 setup
 			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-		if session_2_command is None:
+		if session_2 is None:
 			# Two panes only
 			if self.vertically_split:
 				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
