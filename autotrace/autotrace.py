@@ -13,7 +13,7 @@ from curtsies.input import Input
 # TODO: implement help
 # TODO: toggle for showing commands in panes, highlight
 # TODO: default to 'strace the last thing you ran'? ps -o pid=,lstart=
-# TODO: stop elapsed time on pause
+# TODO: stop elapsed time on pause
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -398,13 +398,13 @@ class PexpectSession(object):
 			last_time_seen         = None
 			output_lines_cursor    = None
 			pane_line_counter      = None
-			# Means: We know where we end but not where we start (scroll back)
+			# Means: We know where we end but not where we start (scroll back)
 			if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
 				pass
-			# Means: We know where we start but not where we end (scroll forward)
+			# Means: We know where we start but not where we end (scroll forward)
 			if self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is None:
 				pass
-			# Means: We don't know where are! This happens at the start.
+			# Means: We don't know where are! This happens at the start.
 			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
 
 			for line_obj in self.output_lines:
@@ -413,27 +413,31 @@ class PexpectSession(object):
 					output_lines_cursor = 0
 				else:
 					output_lines_cursor += 1
-				# If we go past the output line pointer, then break - we don't want to see any later lines.
+				# If we go past the output line pointer, then break - we don't want to see any later lines.
 				if self.output_lines_end_pane_pointer is not None and output_lines_cursor > self.output_lines_end_pane_pointer:
 					break
 				if self.logtimestep:
 					if last_time_seen is None or int(line_obj.time_seen) > last_time_seen:
 						lines_in_pane_str_arr.append(['AutotraceTime:' + str(int(line_obj.time_seen)), output_lines_cursor])
 					last_time_seen = int(line_obj.time_seen)
-				# Strip whitespace at end, including \r\n
+				# Strip whitespace at end, including \r\n
 				line = line_obj.line_str.rstrip()
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
 					# We are within the realm of the pane now
 					pane_line_counter = 0
+				break_at_end_of_this_line = False
 				while len(line) > width-1:
 					# When we get to the top visible line index, kick off the
-					# counter and up one for each pane line computed.
+					# counter and up one for each pane line computed.
 					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 					line = line[width-1:]
 					if pane_line_counter is not None:
 						pane_line_counter += 1
 						if pane_line_counter > height - 1:
-							break
+							# Make sure we finish this line, so iterate until done!
+							break_at_end_of_this_line = True
+				if break_at_end_of_this_line:
+					break
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
 				if pane_line_counter is not None:
 					pane_line_counter += 1
@@ -441,6 +445,7 @@ class PexpectSession(object):
 						break
 			output_lines_end_pane_pointer_has_been_set = False
 			for i, line in zip(reversed(range(self.session_pane.top_left_y,self.session_pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
+				self.pexpect_session_manager.debug_msg(line[0])
 				self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
 				if not output_lines_end_pane_pointer_has_been_set:
 					self.output_lines_end_pane_pointer = line[1]
