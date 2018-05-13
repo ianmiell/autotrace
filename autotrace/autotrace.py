@@ -11,7 +11,10 @@ from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, gre
 from curtsies.input import Input
 
 # TODO: implement help
-# TODO: toggle for showing commands in panes, highlight
+# TODO: fix cycling windows
+# TODO: status bar per pane, toggle for showing commands in panes, highlight
+# TODO: zoom window
+# TODO: remove cursor
 # TODO: default to 'strace the last thing you ran'? ps -o pid=,lstart=
 # TODO: stop elapsed time on pause
 # TODO: replay function?
@@ -73,7 +76,7 @@ class PexpectSessionManager(object):
 			time.sleep(pause)
 
 	def refresh_window(self):
-		self.window               = curtsies.FullscreenWindow()
+		self.window               = curtsies.FullscreenWindow(hide_cursor=True)
 		self.screen_arr           = None
 		self.wheight              = self.window.height
 		self.wwidth               = self.window.width
