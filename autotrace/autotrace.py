@@ -337,10 +337,6 @@ class PexpectSessionManager(object):
 					session.output_top_visible_line_index = None
 				else:
 					return_msg = ' at least one session has hit the top'
-				self.debug_msg('================================================================================')
-				self.debug_msg('scrolling backwards in session: ' + str(session.pid))
-				self.debug_msg(str(self))
-				self.debug_msg(str(session))
 		return return_msg
 
 	def scroll_forward(self):
@@ -353,11 +349,7 @@ class PexpectSessionManager(object):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 					session.output_lines_end_pane_pointer = None
 				else:
-					return_msg = ' at least one session has hit the end' 
-				self.debug_msg('================================================================================')
-				self.debug_msg('scrolling forward in session: ' + str(session.pid))
-				self.debug_msg(str(self))
-				self.debug_msg(str(session))
+					return_msg = ' at least one session has hit the end'
 		return return_msg
 
 	def move_panes_to_tail(self):
@@ -407,9 +399,8 @@ class PexpectSession(object):
 	def write_out_session_to_fit_pane(self):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
-		self.pexpect_session_manager.debug_msg('In write_out_session_to_fit_pane for session: ' + str(self.pid))
-		pane = self.session_pane
-		if pane:
+		#self.pexpect_session_manager.debug_msg('In write_out_session_to_fit_pane for session: ' + str(self.pid))
+		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
 			height = self.session_pane.get_height()
@@ -425,7 +416,7 @@ class PexpectSession(object):
 				pass
 			# Means: We don't know where are! This happens at the start.
 			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
-			
+
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
 				if output_lines_cursor is None:
@@ -447,24 +438,20 @@ class PexpectSession(object):
 				while len(line) > width-1:
 					# When we get to the top visible line index, kick off the
 					# counter and up one for each pane line computed.
-					self.pexpect_session_manager.debug_msg('pane_line_counter = ' + str(pane_line_counter))
-					self.pexpect_session_manager.debug_msg('height = ' + str(height))
 					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 					line = line[width-1:]
 					if pane_line_counter is not None:
-						self.pexpect_session_manager.debug_msg(line)
 						pane_line_counter += 1
 						if pane_line_counter > height - 1:
 							break
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
 				if pane_line_counter is not None:
-					self.pexpect_session_manager.debug_msg(line)
 					pane_line_counter += 1
 					if pane_line_counter > height - 1:
 						break
 			output_lines_end_pane_pointer_has_been_set = False
-			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
-				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line[0])] = [pane.color(line[0])]
+			for i, line in zip(reversed(range(self.session_pane.top_left_y,self.session_pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
+				self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
 				if not output_lines_end_pane_pointer_has_been_set:
 					self.output_lines_end_pane_pointer = line[1]
 					output_lines_end_pane_pointer_has_been_set = True
@@ -511,7 +498,7 @@ class PexpectSession(object):
 			self.output_lines_end_pane_pointer = len(self.output_lines)-1
 		else:
 			self.output_lines_end_pane_pointer += 1
-		# Move pane visibility along one too.
+		# Move pane visibility along one too if the state is .
 		if self.output_top_visible_line_index is not None:
 			self.output_top_visible_line_index += 1
 
