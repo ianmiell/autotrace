@@ -13,7 +13,6 @@ from curtsies.input import Input
 # TODO: implement help
 # TODO: fix cycling windows
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
-# TODO: zoom window (see TODOs below)
 # TODO: remove cursor (how?)
 # TODO: default to 'strace the last thing you ran'? see get_last_run_pid
 # TODO: define and stop run_time on pause
@@ -102,6 +101,8 @@ class PexpectSessionManager(object):
 		# eg we have 1, 2, 3, 4, 5
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
 		# TODO: actually move the panes
+		# TODO: get the pane of session number (using unwritten function get_pane_by_session_number)
+		#       then actually move the pane objects around.
 		for session in self.pexpect_sessions:
 			if session.session_number == 0:
 				# Do nothing - this does not get touched
@@ -265,9 +266,11 @@ class PexpectSessionManager(object):
 			other_session = PexpectSession(other_command, self, session_count, logtimestep=logtimestep)
 			self.pexpect_sessions.append(other_session)
 			session_count += 1
-		self.do_layout()
+		self.do_layout('default')
 
-	def do_layout(self):
+
+	def do_layout(self, layout):
+		assert isinstance(layout, str)
 		main_session      = None
 		session_1         = None
 		session_2         = None
@@ -282,25 +285,35 @@ class PexpectSessionManager(object):
 			elif session.session_number == 3:
 				session_3    = session
 		assert main_session is not None and session_1 is not None
-		if session_3 is None:
-			if self.vertically_split:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+
+		if layout == 'default':
+			if session_3 is None:
+				# Two panes only, so are we vertically split?
+				if self.vertically_split:
+					main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+				else:
+					main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 			else:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-		else:
-			# At least 3 sessions, so set up main session...
-			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
-			# ... and then session 3 setup
-			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-		if session_2 is None:
-			# Two panes only
-			if self.vertically_split:
-				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+				# At least 3 sessions (4 including main), so set up main session in top left...
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
+				# ... and then session 3 setup in top right.
+				session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+			if session_2 is None:
+				# Two panes only, so are we vertically split?
+				if self.vertically_split:
+					session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+				else:
+					session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 			else:
-				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+				# At least 2 sessions (3 including main), so set up second session in bottom left...
+				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+				# ... and then session 3 in bottom right.
+				session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+		elif layout == 'zoom':
+			# TODO: handle zooming, eg if layout == 'zoomed':
+			pass
 		else:
-			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
-			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+			assert False, 'do_layout: ' + layout + ' not handled'
 
 
 	def pause_sessions(self):
@@ -408,6 +421,10 @@ class PexpectSession(object):
 			self.session_pane.top_left     = (-1,-1)
 			self.session_pane.bottom_right = (-1,-1)
 		assert isinstance(self.session_number, int)
+
+	def get_pane_by_session_number(session_number):
+		# TODO: write this
+		pass
 
 	def __str__(self):
 		string = ''
