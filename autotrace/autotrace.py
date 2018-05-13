@@ -97,24 +97,14 @@ class PexpectSessionManager(object):
 		# eg we have 1, 2, 3, 4, 5
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
 		# TODO: actually move the panes
-		max_session_number, _ = self.get_number_of_sessions()
-		assert max_session_number > 4
 		for session in self.pexpect_sessions:
 			if session.session_number == 0:
 				# Do nothing - this does not get touched
 				pass
 			elif session.session_number == 1:
-				session.session_number = max_session_number
+				session.session_number = num_sessions - 1
 			else:
 				session.session_number = session.session_number - 1
-
-	def get_number_of_sessions(self):
-		max_session_number = 0
-		reserved_list = (0,1,2,3)
-		for session in self.pexpect_sessions:
-			if session.session_number not in reserved_list and max_session_number < session.session_number:
-				max_session_number = session.session_number
-		return max_session_number, max_session_number + len(reserved_list)
 
 	def draw_screen(self, draw_type):
 		assert draw_type in ('sessions','help')
@@ -123,8 +113,8 @@ class PexpectSessionManager(object):
 		header_text = 'autotrace running... ' + self.status_message
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
-		_, number_of_sessions = self.get_number_of_sessions()
-		if number_of_sessions > 0:
+		number_of_sessions = len(self.pexpect_sessions)
+		if number_of_sessions > 4:
 			quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
 		else:
 			quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
