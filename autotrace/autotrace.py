@@ -422,8 +422,8 @@ class PexpectSession(object):
 					if last_time_seen is None or int(line_obj.time_seen) > last_time_seen:
 						lines_in_pane_str_arr.append(['AutotraceTime:' + str(int(line_obj.time_seen)), output_lines_cursor])
 					last_time_seen = int(line_obj.time_seen)
-				# Strip newline
-				line = line_obj.line_str.strip()
+				# Strip whitespace at end, including \r\n
+				line = line_obj.line_str.rstrip()
 				while len(line) > width-1:
 					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 					line = line[width-1:]
