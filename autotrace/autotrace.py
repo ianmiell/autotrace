@@ -67,6 +67,8 @@ class PexpectSessionManager(object):
 	def debug_msg(self, msg,pause=None):
 		if self.debug:
 			print(msg)
+		else:
+			self.write_to_logfile('DEBUG MESSAGE:\n' + msg)
 		if pause:
 			time.sleep(pause)
 
@@ -342,12 +344,14 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				# TODO debug - so the end pan pointer needs to be put there, but we need to count the lines actually seen when writing out until it gets to the end of the end.
+				# TODO debug - jumps to the end?
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer < len(session.output_lines):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 					session.output_lines_end_pane_pointer = None
 				else:
 					return_msg = ' at least one session has hit the end' 
+				self.debug_msg('scrolling forward')
+				self.debug_msg(str(self))
 		return return_msg
 
 	def move_panes_to_tail(self):
@@ -393,13 +397,17 @@ class PexpectSession(object):
 		return string
 
 	def write_out_session_to_fit_pane(self):
+		"""This function is responsible for taking the state of the session and writing it out to its pane.
+		"""
 		pane = self.session_pane
 		if pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
+			height = self.session_pane.get_height()
 			lines_in_pane_str_arr  = []
 			last_time_seen         = None
 			output_lines_cursor    = None
+			pane_line_counter      = None
 			# Means: We know where we end but not where we start (scroll back)
 			if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
 				pass
@@ -425,8 +433,17 @@ class PexpectSession(object):
 				# Strip whitespace at end, including \r\n
 				line = line_obj.line_str.rstrip()
 				while len(line) > width-1:
+					# When we get to the top visible line index, kick off the
+					# counter and up one for each pane line computed.
+					if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
+						# We are within the realm of the pane now
+						pane_line_counter = 0
 					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 					line = line[width-1:]
+					if pane_line_counter is not None:
+						pane_line_counter += 1
+						if pane_line_counter > height - 1:
+							break
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
 			output_lines_end_pane_pointer_has_been_set = False
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
