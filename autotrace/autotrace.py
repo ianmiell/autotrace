@@ -398,22 +398,28 @@ class PexpectSession(object):
 			assert self.session_pane
 			width = self.session_pane.get_width()
 			lines_in_pane_str_arr  = []
-			last_time_seen         = -1
-			output_lines_cursor    = -1
-			if self.output_top_visible_line_index is None:
-				# Means: We don't know where we start
+			last_time_seen         = None
+			output_lines_cursor    = None
+			# Means: We know where we end but not where we start (scroll back)
+			if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
 				pass
-			if self.output_lines_end_pane_pointer is None:
-				# Means: We don't know where we end
+			# Means: We know where we start but not where we end (scroll forward)
+			if self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is None:
 				pass
+			# Means: We don't know where are! This happens at the start.
+			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
 			
 			for line_obj in self.output_lines:
-				output_lines_cursor += 1
+				# We have moved to the next object in the output_lines array
+				if output_lines_cursor is None:
+					output_lines_cursor = 0
+				else:
+					output_lines_cursor += 1
 				# If we go past the output line pointer, then break - we don't want to see any later lines.
 				if self.output_lines_end_pane_pointer is not None and output_lines_cursor > self.output_lines_end_pane_pointer:
 					break
 				if self.logtimestep:
-					if int(line_obj.time_seen) > last_time_seen:
+					if last_time_seen is None or int(line_obj.time_seen) > last_time_seen:
 						lines_in_pane_str_arr.append(['AutotraceTime:' + str(int(line_obj.time_seen)), output_lines_cursor])
 					last_time_seen = int(line_obj.time_seen)
 				# Strip newline
@@ -422,8 +428,12 @@ class PexpectSession(object):
 					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 					line = line[width-1:]
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
+			output_lines_end_pane_pointer_has_been_set = False
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
 				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line[0])] = [pane.color(line[0])]
+				if not output_lines_end_pane_pointer_has_been_set:
+					self.output_lines_end_pane_pointer = line[1]
+					output_lines_end_pane_pointer_has_been_set = True
 				# Record the uppermost-visible line
 				self.output_top_visible_line_index = line[1]
 
