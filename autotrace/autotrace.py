@@ -236,9 +236,12 @@ class PexpectSessionManager(object):
 		assert not args.v or session_2_command is None, 'BUG! Vertical arg should be off at this point if session_2 exists'
 		args = None
 		# Args, collected, set up commands and sessions
-		# Main command setup
-		main_session = PexpectSession(main_command, self, 0, pane_name='top_left', pane_color=green, logtimestep=logtimestep)
+
+		# Setup command information, and keep a count of sessions
+		session_count = 0
+		main_session = PexpectSession(main_command, self, session_count, pane_name='top_left', pane_color=green, logtimestep=logtimestep)
 		main_session.spawn()
+		session_count += 1
 		if session_1_command is None:
 			if platform.system() == 'Darwin':
 				session_1_command = 'dtruss -f -p ' + str(main_session.pid)
@@ -246,13 +249,22 @@ class PexpectSessionManager(object):
 				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			session_1_command = replace_pid(session_1_command, str(main_session.pid))
-		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left', logtimestep=logtimestep)
+		session_1 = PexpectSession(session_1_command, self, session_count, pane_name='bottom_left', logtimestep=logtimestep)
+		session_count += 1
 		if session_2_command is not None:
-			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right', logtimestep=logtimestep)
+			session_2 = PexpectSession(session_2_command, self, session_count, pane_name='bottom_right', logtimestep=logtimestep)
 			session_2_command = replace_pid(session_2_command, str(main_session.pid))
+			session_count += 1
 		if session_3_command is not None:
-			session_3 = PexpectSession(session_3_command, self, 3, 'top_right', logtimestep=logtimestep)
+			session_3 = PexpectSession(session_3_command, self, session_count, 'top_right', logtimestep=logtimestep)
 			session_3_command = replace_pid(session_3_command, str(main_session.pid))
+			session_count += 1
+		# Set up any other sessions to be set up with no panes.
+		for other_command in remaining_commands:
+			other_command = replace_pid(other_command, str(main_session.pid))
+			other_session = PexpectSession(other_command, self, session_count, logtimestep=logtimestep)
+			self.pexpect_sessions.append(other_session)
+			session_count += 1
 
 		# TODO: abstract this so we can call it anytime
 		if session_3_command is None:
@@ -261,12 +273,10 @@ class PexpectSessionManager(object):
 			else:
 				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 		else:
-			# At least 3 sessions
+			# At least 3 sessions, so set up main session...
 			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
-			# Session 3 setup
+			# ... and then session 3 setup
 			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-		# Session 1 setup
-		# Default tracer is a syscall tracer
 		if session_2_command is None:
 			# Two panes only
 			if self.vertically_split:
@@ -277,13 +287,6 @@ class PexpectSessionManager(object):
 			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
-		# Set up any other sessions to be set up with no panes.
-		count = 4
-		for other_command in remaining_commands:
-			other_command = replace_pid(other_command, str(main_session.pid))
-			other_session = PexpectSession(other_command, self, count, logtimestep=logtimestep)
-			self.pexpect_sessions.append(other_session)
-			count += 1
 
 	def pause_sessions(self):
 		for session in self.pexpect_sessions:
