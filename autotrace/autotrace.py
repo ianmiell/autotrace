@@ -13,10 +13,10 @@ from curtsies.input import Input
 # TODO: implement help
 # TODO: fix cycling windows
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
-# TODO: zoom window
-# TODO: remove cursor
-# TODO: default to 'strace the last thing you ran'? ps -o pid=,lstart=
-# TODO: stop elapsed time on pause
+# TODO: zoom window (see TODOs below)
+# TODO: remove cursor (how?)
+# TODO: default to 'strace the last thing you ran'? see get_last_run_pid
+# TODO: define and stop run_time on pause
 # TODO: replay function?
 #       - add in timer to synchonise time
 #       - put elapsed time in before each line
@@ -30,7 +30,7 @@ from curtsies.input import Input
 class PexpectSessionManager(object):
 	# Singleton
 	only_one = None
-	def __init__(self, logdir=None, debug=False):
+	def __init__(self, logdir=None, debug=False, encoding='utf-8'):
 		assert self.only_one is None
 		self.only_one             = True
 		self.debug                = debug
@@ -40,6 +40,7 @@ class PexpectSessionManager(object):
 		self.main_command_session = None
 		self.pid                  = os.getpid()
 		self.timeout_delay        = 0.001
+		self.encoding             = encoding
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -60,6 +61,7 @@ class PexpectSessionManager(object):
 		self.refresh_window()
 		self.start_time           = time.time()
 		self.screen_arr           = None
+		self.vertically_split     = False
 
 	def __str__(self):
 		string = ''
@@ -159,6 +161,9 @@ class PexpectSessionManager(object):
 					seen_output = True
 
 	def handle_input(self):
+		# TODO: recurse to handle_input and switch on state
+		# TODO: zoom in and out, toggling on pane number - 1,2,3,4
+		#       zoom requires that layout is abstracted.
 		# TODO: handle help message here as opportunities vary
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
@@ -216,7 +221,6 @@ class PexpectSessionManager(object):
 		session_1_command = None
 		session_2_command = None
 		session_3_command = None
-
 		main_command         = args.commands[0]
 		if num_commands > 1:
 			session_1_command  = args.commands[1]
@@ -227,28 +231,14 @@ class PexpectSessionManager(object):
 		if num_commands > 3:
 			session_3_command    = args.commands[3]
 		remaining_commands = args.commands[3:]
-		vertically_split = args.v
+		self.vertically_split = args.v
 		logtimestep      = args.logtimestep
 		assert not args.v or session_2_command is None, 'BUG! Vertical arg should be off at this point if session_2 exists'
 		args = None
-
+		# Args, collected, set up commands and sessions
 		# Main command setup
 		main_session = PexpectSession(main_command, self, 0, pane_name='top_left', pane_color=green, logtimestep=logtimestep)
 		main_session.spawn()
-		if session_3_command is None:
-			if vertically_split:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
-			else:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-		else:
-			# At least 3 sessions
-			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
-			# Session 3 setup
-			session_3_command = replace_pid(session_3_command, str(main_session.pid))
-			session_3 = PexpectSession(session_3_command, self, 3, 'top_right', logtimestep=logtimestep)
-			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-		# Session 1 setup
-		# Default tracer is a syscall tracer
 		if session_1_command is None:
 			if platform.system() == 'Darwin':
 				session_1_command = 'dtruss -f -p ' + str(main_session.pid)
@@ -257,16 +247,34 @@ class PexpectSessionManager(object):
 		else:
 			session_1_command = replace_pid(session_1_command, str(main_session.pid))
 		session_1 = PexpectSession(session_1_command, self, 1, pane_name='bottom_left', logtimestep=logtimestep)
+		if session_2_command is not None:
+			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right', logtimestep=logtimestep)
+			session_2_command = replace_pid(session_2_command, str(main_session.pid))
+		if session_3_command is not None:
+			session_3 = PexpectSession(session_3_command, self, 3, 'top_right', logtimestep=logtimestep)
+			session_3_command = replace_pid(session_3_command, str(main_session.pid))
+
+		# TODO: abstract this so we can call it anytime
+		if session_3_command is None:
+			if self.vertically_split:
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+			else:
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+		else:
+			# At least 3 sessions
+			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
+			# Session 3 setup
+			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+		# Session 1 setup
+		# Default tracer is a syscall tracer
 		if session_2_command is None:
 			# Two panes only
-			if vertically_split:
+			if self.vertically_split:
 				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 			else:
 				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 		else:
 			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
-			session_2_command = replace_pid(session_2_command, str(main_session.pid))
-			session_2 = PexpectSession(session_2_command, self, 2, pane_name='bottom_right', logtimestep=logtimestep)
 			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 		# Set up any other sessions to be set up with no panes.
@@ -348,6 +356,12 @@ class PexpectSessionManager(object):
 	def move_panes_to_tail(self):
 		for session in self.pexpect_sessions:
 			session.output_lines_end_pane_pointer = len(session.output_lines)-1
+
+	def get_last_run_pid(self):
+		ps_output=pexpect.run('export TZ=UTC0 LC_ALL=C ps -o pid=,lstart=').decode(self.encoding)
+		for l in ps_output.split('\r\n'):
+			# TODO: parse date into seconds, pick the highest
+			pass
 
 
 class PexpectSession(object):

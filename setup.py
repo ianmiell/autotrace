@@ -12,7 +12,7 @@ setup(
     author='Ian Miell',
     author_email='ian.miell@gmail.com',
     packages=find_packages(exclude=[]),
-    install_requires=['curtsies','pexpect'],
+    install_requires=['curtsies','pexpect','dateparser'],
     entry_points={
         'console_scripts': [
             'autotrace=autotrace.autotrace:main',
