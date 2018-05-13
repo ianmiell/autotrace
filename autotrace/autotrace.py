@@ -175,6 +175,7 @@ class PexpectSessionManager(object):
 				self.draw_screen('sessions')
 				for e in input_generator:
 					if e == 'c':
+						self.move_panes_to_tail()
 						self.unpause_sessions()
 						self.status = 'Running'
 						self.draw_screen('sessions')
@@ -329,8 +330,9 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				if session.output_lines_end_pane_pointer > 0:
+				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
+					session.output_top_visible_line_index = None
 				else:
 					return_msg = ' at least one session has hit the top'
 		return return_msg
@@ -340,12 +342,17 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				# TODO debug
-				if session.output_lines_end_pane_pointer < len(session.output_lines):
+				# TODO debug - so the end pan pointer needs to be put there, but we need to count the lines actually seen when writing out until it gets to the end of the end.
+				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer < len(session.output_lines):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
+					session.output_lines_end_pane_pointer = None
 				else:
 					return_msg = ' at least one session has hit the end' 
 		return return_msg
+
+	def move_panes_to_tail(self):
+		for session in self.pexpect_sessions:
+			session.output_lines_end_pane_pointer = len(session.output_lines)-1
 
 
 class PexpectSession(object):
@@ -355,10 +362,10 @@ class PexpectSession(object):
 		self.session_number                = session_number
 		self.command                       = command
 		self.output_lines                  = []
-		self.output_lines_end_pane_pointer = -1
+		self.output_lines_end_pane_pointer = None
 		# Pointer to the uppermost-visible PexpectSessionLine in this pane
 		self.output_top_visible_line_index = None
-		self.pid                           = -1
+		self.pid                           = None
 		self.encoding                      = encoding
 		self.pexpect_session_manager       = pexpect_session_manager
 		self.logfilename                   = pexpect_session_manager.logdir + '/' + str(self.session_number) + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
@@ -390,24 +397,31 @@ class PexpectSession(object):
 		if pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
-			lines_in_pane_str_arr = []
-			last_time_seen = -1
-			output_lines_index = -1
+			lines_in_pane_str_arr  = []
+			last_time_seen         = -1
+			output_lines_cursor    = -1
+			if self.output_top_visible_line_index is None:
+				# Means: We don't know where we start
+				pass
+			if self.output_lines_end_pane_pointer is None:
+				# Means: We don't know where we end
+				pass
+			
 			for line_obj in self.output_lines:
-				output_lines_index += 1
+				output_lines_cursor += 1
 				# If we go past the output line pointer, then break - we don't want to see any later lines.
-				if output_lines_index > self.output_lines_end_pane_pointer:
+				if self.output_lines_end_pane_pointer is not None and output_lines_cursor > self.output_lines_end_pane_pointer:
 					break
 				if self.logtimestep:
 					if int(line_obj.time_seen) > last_time_seen:
-						lines_in_pane_str_arr.append(['AutotraceTime:' + str(int(line_obj.time_seen)), output_lines_index])
+						lines_in_pane_str_arr.append(['AutotraceTime:' + str(int(line_obj.time_seen)), output_lines_cursor])
 					last_time_seen = int(line_obj.time_seen)
 				# Strip newline
 				line = line_obj.line_str.strip()
 				while len(line) > width-1:
-					lines_in_pane_str_arr.append([line[:width-1], output_lines_index])
+					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 					line = line[width-1:]
-				lines_in_pane_str_arr.append([line, output_lines_index])
+				lines_in_pane_str_arr.append([line, output_lines_cursor])
 			for i, line in zip(reversed(range(pane.top_left_y,pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
 				self.pexpect_session_manager.screen_arr[i:i+1, pane.top_left_x:pane.top_left_x+len(line[0])] = [pane.color(line[0])]
 				# Record the uppermost-visible line
@@ -447,8 +461,12 @@ class PexpectSession(object):
 		return False
 
 	def append_output_line(self, string, line_type):
-		self.output_lines_end_pane_pointer += 1
+		# We should be 'un-paused' at this point, so in tailing mode.
 		self.output_lines.append(PexpectSessionLine(string, self.pexpect_session_manager.get_elapsed_time(), line_type))
+		if self.output_lines_end_pane_pointer is None:
+			self.output_lines_end_pane_pointer = len(self.output_lines)-1
+		else:
+			self.output_lines_end_pane_pointer += 1
 
 
 # Represents a line in the array of output
