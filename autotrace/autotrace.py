@@ -415,9 +415,16 @@ class PexpectSessionManager(object):
 			session.output_lines_end_pane_pointer = len(session.output_lines)-1
 
 	def get_last_run_pid(self):
-		ps_output=pexpect.run('export TZ=UTC0 LC_ALL=C ps -o pid=,lstart=').decode(self.encoding)
+		ps_output=pexpect.run('ps -o pid=,command= | grep -v "ps -o pid=,command="').decode(self.encoding)
+		pids = []
 		for l in ps_output.split('\r\n'):
-			# TODO: parse date into seconds, pick the highest
+			pid = l.split(' ')[0]
+			# TODO: check pid is an integer
+			pids.append(pid)
+		for pid in pids:
+			process_time = pexpect.run('''(export TZ=UTC0; date -d "$(ps -o lstart= -p "''' + pid + '''") +%s)''')
+			# TODO: ignore the first one - that's a shell
+			# TODO: pick the highest - is it the root terminal
 			pass
 
 	def get_pane_by_session_number(self, session_number):
