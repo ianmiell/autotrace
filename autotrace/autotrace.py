@@ -119,18 +119,13 @@ class PexpectSessionManager(object):
 				session.session_pane = new_panes[session.session_number]
 		new_panes = None
 
-	def draw_screen(self, draw_type):
+	def draw_screen(self, draw_type, quick_help):
 		assert draw_type in ('sessions','help')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
 		header_text = 'autotrace running... ' + self.status_message
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
-		number_of_sessions = len(self.pexpect_sessions)
-		if number_of_sessions > 4:
-			quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
-		else:
-			quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
 		footer_text = self.status + space + quick_help
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
@@ -177,58 +172,75 @@ class PexpectSessionManager(object):
 			if not lines_seen[session]:
 				session.append_output_line('','display_sync_line')
 
+	def get_quick_help(self):
+		if self.status == 'Running':
+			number_of_sessions = len(self.pexpect_sessions)
+			if number_of_sessions > 4:
+				quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
+			else:
+				quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
+		elif self.status == 'Paused':
+			quick_help = 'ESC/q: quit, c: continue running, f: page forward, b: page back, h: help =>  '
+		return quick_help
+
+
 
 	def handle_input(self):
-		# TODO: recurse to handle_input and switch on state
 		# TODO: zoom in and out, toggling on pane number - 1,2,3,4
 		#       zoom requires that layout is abstracted.
-		# TODO: handle help message here as opportunities vary
+		quick_help = self.get_quick_help()
+		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
-			if input_char in (u'<ESC>', u'<Ctrl-d>', u'q'):
+			if input_char:
+				self.write_to_manager_logfile('input_char: ' + input_char)
+			if input_char in quit_chars:
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
+			elif input_char in (u'm',):
+				self.cycle_panes()
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'p',):
+				# Handle paused state
 				self.status = 'Paused'
 				self.pause_sessions()
-				self.draw_screen('sessions')
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
 				for e in input_generator:
-					if e == 'c':
+					if input_char in quit_chars:
+						self.quit_autotrace()
+					elif e == 'c':
 						self.move_panes_to_tail()
 						self.unpause_sessions()
 						self.status = 'Running'
-						self.draw_screen('sessions')
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						break
-					elif e == 'q':
-						self.quit_autotrace()
 					elif e == 'b':
 						msg = self.scroll_back()
 						self.status_message = 'you just hit back ' + msg
-						self.draw_screen('sessions')
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'f':
 						msg = self.scroll_forward()
 						self.status_message = 'you just hit forward ' + msg
-						self.draw_screen('sessions')
-			elif input_char == 'q':
-				self.quit_autotrace()
-			elif input_char in (u'm',):
-				self.cycle_panes()
-				self.draw_screen('sessions')
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
+					else:
+						self.write_to_manager_logfile('input_char: ' + input_char)
 			elif input_char in (u'h',):
+				quick_help = 'ESC/q: quit, c: continue running =>  '
+				# Handle help state
 				self.status = 'Help'
 				# Default is to pause sessions here - good idea?
 				self.pause_sessions()
-				self.draw_screen('help')
+				self.draw_screen('help',quick_help=self.get_quick_help())
 				for e in input_generator:
-					if e == 'c':
+					if e in quit_chars:
+						# TODO: maybe go back to running from here?
+						self.quit_autotrace()
+					elif e == 'c':
 						self.unpause_sessions()
 						self.status = 'Running'
-						self.draw_screen('sessions')
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						break
-					elif e == 'q':
-						self.quit_autotrace()
-			elif input_char:
-				self.write_to_manager_logfile('input_char')
-				self.write_to_manager_logfile(input_char)
+					else:
+						self.write_to_manager_logfile('input_char: ' + input_char)
 
 
 	# Handles initial placement of sessions and panes.
@@ -407,7 +419,7 @@ class PexpectSessionManager(object):
 		pids = []
 		for l in ps_output.split('\r\n'):
 			pid = l.split(' ')[0]
-			# TODO: check pid is an integer
+			assert int(pid), 'pid is not an integer: ' + str(pid)
 			pids.append(pid)
 		for pid in pids:
 			process_time = pexpect.run('''(export TZ=UTC0; date -d "$(ps -o lstart= -p "''' + pid + '''") +%s)''')
@@ -670,7 +682,7 @@ def main():
 		while True:
 			try:
 				while True:
-					pexpect_session_manager.draw_screen('sessions')
+					pexpect_session_manager.draw_screen('sessions',quick_help=pexpect_session_manager.get_quick_help())
 					pexpect_session_manager.handle_sessions()
 					pexpect_session_manager.handle_input()
 			except KeyboardInterrupt:
