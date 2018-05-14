@@ -12,7 +12,7 @@ from curtsies.input import Input
 
 PY3 = sys.version_info[0] >= 3
 if PY3:
-    unicode = str
+	unicode = str
 
 # TODO: implement help
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
@@ -100,36 +100,24 @@ class PexpectSessionManager(object):
 
 	def cycle_panes(self):
 		# Must have more than 4 panes to do a cycle (including main command)
-		num_sessions = len(self.pexpect_sessions)
-		if num_sessions <= 4:
+		if len(self.pexpect_sessions) <= 4:
 			return False
 		# eg we have 1, 2, 3, 4, 5
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
 		# Get the pane of session number (using function get_pane_by_session_number)
 		# then actually move the pane objects around.
-		#self.debug_msg('BEFORE')
-		#self.debug_msg(str(self))
 		new_panes = {}
-		#self.debug_msg('len(pexpect_sessions) ' + str(len(self.pexpect_sessions)))
 		for session in self.pexpect_sessions:
 			if session.session_number == 0:
 				pass # Do nothing - this does not get touched
 			elif session.session_number == 1:
-				#self.debug_msg('SESSION ' + str(session.session_number) + ' GETS: ' + str(self.get_pane_by_session_number(len(self.pexpect_sessions) - 1)))
 				new_panes.update({session.session_number:self.get_pane_by_session_number(len(self.pexpect_sessions) - 1)})
-				#session.session_number = num_sessions - 1
 			else:
-				#self.debug_msg('SESSION ' + str(session.session_number) + ' GETS: ' + str(self.get_pane_by_session_number(session.session_number - 1)))
 				new_panes.update({session.session_number:self.get_pane_by_session_number(session.session_number - 1)})
-				#session.session_number = session.session_number - 1
 		for session in self.pexpect_sessions:
-			if session.session_number == 0:
-				pass # Do nothing - this does not get touched
-			else:
+			if session.session_number != 0:
 				session.session_pane = new_panes[session.session_number]
 		new_panes = None
-		#self.debug_msg('AFTER')
-		#self.debug_msg(str(self))
 
 	def draw_screen(self, draw_type):
 		assert draw_type in ('sessions','help')
@@ -485,9 +473,6 @@ class PexpectSession(object):
 		"""
 		if self.session_pane:
 			assert self.session_pane
-			#self.pexpect_session_manager.debug_msg('This session has a pane: ' + str(self.session_number))
-			#self.pexpect_session_manager.debug_msg(str(self))
-			#self.pexpect_session_manager.debug_msg('Pane name is: ' + str(self.session_pane.name))
 			width = self.session_pane.get_width()
 			height = self.session_pane.get_height()
 			lines_in_pane_str_arr  = []
@@ -503,7 +488,6 @@ class PexpectSession(object):
 			# Means: We don't know where are! This happens at the start.
 			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
 
-			#self.pexpect_session_manager.debug_msg('output lines: ')
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
 				if output_lines_cursor is None:
@@ -519,7 +503,6 @@ class PexpectSession(object):
 					last_time_seen = int(line_obj.time_seen)
 				# Strip whitespace at end, including \r\n
 				line = line_obj.line_str.rstrip()
-				#self.pexpect_session_manager.debug_msg('    ' + line)
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
 					# We are within the realm of the pane now
 					pane_line_counter = 0
@@ -543,7 +526,6 @@ class PexpectSession(object):
 						break
 			output_lines_end_pane_pointer_has_been_set = False
 			for i, line in zip(reversed(range(self.session_pane.top_left_y,self.session_pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
-				#self.pexpect_session_manager.debug_msg(line[0])
 				self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
 				if not output_lines_end_pane_pointer_has_been_set:
 					self.output_lines_end_pane_pointer = line[1]
@@ -684,7 +666,6 @@ def main():
 			if session.session_number == 0:
 				main_command_session = session
 			else:
-				pexpect_session_manager.debug_msg(str(pexpect_session_manager))
 				session.spawn()
 		assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
 		pexpect.run('kill -CONT ' + str(main_command_session.pid))

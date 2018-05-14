@@ -1,6 +1,17 @@
 - Run pylint:
 pylint -rn autotrace/autotrace.py
-- Run all the linux examples
+
+- Run
+./examples/linux_*
+
 - Move panes
+
 - Pause/unpause
+
 - Scrolling
+
+- Run
+./examples/mac_*
+on a mac
+
+- Look for debug_msg and remove debug
