@@ -273,12 +273,12 @@ class PexpectSessionManager(object):
 		session_1 = PexpectSession(session_1_command, self, session_count, pane_name='bottom_left', logtimestep=logtimestep)
 		session_count += 1
 		if session_2_command is not None:
-			session_2 = PexpectSession(session_2_command, self, session_count, pane_name='bottom_right', logtimestep=logtimestep)
 			session_2_command = replace_pid(session_2_command, str(main_session.pid))
+			session_2 = PexpectSession(session_2_command, self, session_count, pane_name='bottom_right', logtimestep=logtimestep)
 			session_count += 1
 		if session_3_command is not None:
-			session_3 = PexpectSession(session_3_command, self, session_count, 'top_right', logtimestep=logtimestep)
 			session_3_command = replace_pid(session_3_command, str(main_session.pid))
+			session_3 = PexpectSession(session_3_command, self, session_count, 'top_right', logtimestep=logtimestep)
 			session_count += 1
 		# Set up any other sessions to be set up with no panes.
 		for other_command in remaining_commands:
