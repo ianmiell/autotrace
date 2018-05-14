@@ -18,7 +18,6 @@ if PY3:
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
 # TODO: remove cursor (how?)
 # TODO: default to 'strace the last thing you ran'? see get_last_run_pid
-# TODO: define and stop run_time on pause
 # TODO: replay function?
 #       - put elapsed time in before each line
 #       - replayer will 'just' read through the output files in the logs
@@ -54,15 +53,16 @@ class PexpectSessionManager(object):
 		self.logfile              = open(self.logfilename,'w+')
 		os.chmod(self.logfilename,0o777)
 		# Does user have root?
-		# TODO: emit warning?
+		# TODO: emit warning if not root?
 		self.root_ready     = False
 		if os.getuid() == 0:
 			self.root_ready = True
 		# Setup
 		self.refresh_window()
-		self.start_time           = time.time()
-		self.screen_arr           = None
-		self.vertically_split     = False
+		self.start_time            = time.time()
+		self.paused_total_time     = 0.0 # TODO: start and stop paused timer on start and stop pause.
+		self.screen_arr            = None
+		self.vertically_split      = False
 
 	def __str__(self):
 		string =  '\n============= SESSION MANAGER OBJECT BEGIN ==================='
@@ -226,7 +226,6 @@ class PexpectSessionManager(object):
 						break
 					elif e == 'q':
 						self.quit_autotrace()
-				# TODO: redraw screen and show help
 			elif input_char:
 				self.write_to_manager_logfile('input_char')
 				self.write_to_manager_logfile(input_char)
@@ -392,7 +391,6 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				# TODO debug - jumps to the end?
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer < len(session.output_lines):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 					session.output_lines_end_pane_pointer = None
