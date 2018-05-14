@@ -185,7 +185,7 @@ class PexpectSessionManager(object):
 		assert seen_output
 		for session in self.pexpect_sessions:
 			if not lines_seen[session]:
-				session.append_output_line('HEY','display_sync_line')
+				session.append_output_line('','display_sync_line')
 
 
 	def handle_input(self):
