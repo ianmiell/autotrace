@@ -173,10 +173,20 @@ class PexpectSessionManager(object):
 
 	def handle_sessions(self):
 		seen_output = False
+		lines_seen = {}
 		while not seen_output:
 			for session in self.pexpect_sessions:
+				lines_seen.update({session:False})
 				if session.read_line():
 					seen_output = True
+					lines_seen.update({session:True})
+		# Determine which ones saw output.
+		# The ones that did not need to 'fake read' a line of type 'display_sync_line'
+		assert seen_output
+		for session in self.pexpect_sessions:
+			if not lines_seen[session]:
+				session.append_output_line('HEY','display_sync_line')
+
 
 	def handle_input(self):
 		# TODO: recurse to handle_input and switch on state
@@ -584,7 +594,8 @@ class PexpectSessionLine(object):
 		self.line_str          = line_str
 		self.time_seen         = time_seen
 		self.line_type         = line_type
-		assert self.line_type in ('program_output',)
+		# A 'display_sync_line' is an empty line designed to ensure that display syncs time-wise.
+		assert self.line_type in ('program_output','display_sync_line')
 
 
 # Represents a pane with no concept of context or content.
