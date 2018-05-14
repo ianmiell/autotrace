@@ -11,7 +11,7 @@ from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, gre
 from curtsies.input import Input
 
 # TODO: implement help
-# TODO: fix cycling windows
+# TODO: fix cycling windows
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
 # TODO: remove cursor (how?)
 # TODO: default to 'strace the last thing you ran'? see get_last_run_pid
@@ -103,8 +103,8 @@ class PexpectSessionManager(object):
 			return False
 		# eg we have 1, 2, 3, 4, 5
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
-		# Get the pane of session number (using function get_pane_by_session_number)
-		# then actually move the pane objects around.
+		# Get the pane of session number (using function get_pane_by_session_number)
+		# then actually move the pane objects around.
 		#self.debug_msg('BEFORE')
 		#self.debug_msg(str(self))
 		new_panes = {}
@@ -125,8 +125,6 @@ class PexpectSessionManager(object):
 				pass # Do nothing - this does not get touched
 			else:
 				session.session_pane = new_panes[session.session_number]
-		for session in self.pexpect_sessions:
-			#self.debug_msg(str(session))
 		new_panes = None
 		#self.debug_msg('AFTER')
 		#self.debug_msg(str(self))
@@ -181,7 +179,7 @@ class PexpectSessionManager(object):
 					seen_output = True
 
 	def handle_input(self):
-		# TODO: recurse to handle_input and switch on state
+		# TODO: recurse to handle_input and switch on state
 		# TODO: zoom in and out, toggling on pane number - 1,2,3,4
 		#       zoom requires that layout is abstracted.
 		# TODO: handle help message here as opportunities vary
@@ -269,26 +267,26 @@ class PexpectSessionManager(object):
 				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
 			session_1_command = replace_pid(session_1_command, str(main_session.pid))
-		session_1 = PexpectSession(session_1_command, self, session_count, pane_name='bottom_left', logtimestep=logtimestep)
+		PexpectSession(session_1_command, self, session_count, pane_name='bottom_left', logtimestep=logtimestep)
 		session_count += 1
 		if session_2_command is not None:
 			session_2_command = replace_pid(session_2_command, str(main_session.pid))
-			session_2 = PexpectSession(session_2_command, self, session_count, pane_name='bottom_right', logtimestep=logtimestep)
+			PexpectSession(session_2_command, self, session_count, pane_name='bottom_right', logtimestep=logtimestep)
 			session_count += 1
 		if session_3_command is not None:
 			session_3_command = replace_pid(session_3_command, str(main_session.pid))
-			session_3 = PexpectSession(session_3_command, self, session_count, 'top_right', logtimestep=logtimestep)
+			PexpectSession(session_3_command, self, session_count, 'top_right', logtimestep=logtimestep)
 			session_count += 1
 		# Set up any other sessions to be set up with no panes.
 		for other_command in remaining_commands:
 			other_command = replace_pid(other_command, str(main_session.pid))
-			other_session = PexpectSession(other_command, self, session_count, logtimestep=logtimestep)
+			PexpectSession(other_command, self, session_count, logtimestep=logtimestep)
 			session_count += 1
 		self.do_layout('default')
 
 
 	def do_layout(self, layout):
-		assert isinstance(layout, str)
+		assert isinstance(layout, (str,unicode)), 'layout is of type: ' + str(type(layout))
 		main_session      = None
 		session_1         = None
 		session_2         = None

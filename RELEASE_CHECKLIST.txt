@@ -1,0 +1,6 @@
+- Run pylint:
+pylint -rn autotrace/autotrace.py
+- Run all the linux examples
+- Move panes
+- Pause/unpause
+- Scrolling
