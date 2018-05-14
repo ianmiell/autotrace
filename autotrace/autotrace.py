@@ -103,22 +103,21 @@ class PexpectSessionManager(object):
 			return False
 		# eg we have 1, 2, 3, 4, 5
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
-		# TODO: actually move the panes
-		# TODO: get the pane of session number (using function get_pane_by_session_number)
-		#       then actually move the pane objects around.
-		self.debug_msg('BEFORE')
-		self.debug_msg(str(self))
+		# Get the pane of session number (using function get_pane_by_session_number)
+		# then actually move the pane objects around.
+		#self.debug_msg('BEFORE')
+		#self.debug_msg(str(self))
 		new_panes = {}
-		self.debug_msg('len(pexpect_sessions) ' + str(len(self.pexpect_sessions)))
+		#self.debug_msg('len(pexpect_sessions) ' + str(len(self.pexpect_sessions)))
 		for session in self.pexpect_sessions:
 			if session.session_number == 0:
 				pass # Do nothing - this does not get touched
 			elif session.session_number == 1:
-				self.debug_msg('SESSION ' + str(session.session_number) + ' GETS: ' + str(self.get_pane_by_session_number(len(self.pexpect_sessions) - 1)))
+				#self.debug_msg('SESSION ' + str(session.session_number) + ' GETS: ' + str(self.get_pane_by_session_number(len(self.pexpect_sessions) - 1)))
 				new_panes.update({session.session_number:self.get_pane_by_session_number(len(self.pexpect_sessions) - 1)})
 				#session.session_number = num_sessions - 1
 			else:
-				self.debug_msg('SESSION ' + str(session.session_number) + ' GETS: ' + str(self.get_pane_by_session_number(session.session_number - 1)))
+				#self.debug_msg('SESSION ' + str(session.session_number) + ' GETS: ' + str(self.get_pane_by_session_number(session.session_number - 1)))
 				new_panes.update({session.session_number:self.get_pane_by_session_number(session.session_number - 1)})
 				#session.session_number = session.session_number - 1
 		for session in self.pexpect_sessions:
@@ -127,10 +126,10 @@ class PexpectSessionManager(object):
 			else:
 				session.session_pane = new_panes[session.session_number]
 		for session in self.pexpect_sessions:
-			self.debug_msg(str(session))
+			#self.debug_msg(str(session))
 		new_panes = None
-		self.debug_msg('AFTER')
-		self.debug_msg(str(self))
+		#self.debug_msg('AFTER')
+		#self.debug_msg(str(self))
 
 	def draw_screen(self, draw_type):
 		assert draw_type in ('sessions','help')
@@ -251,7 +250,7 @@ class PexpectSessionManager(object):
 			session_2_command = args.commands[2]
 		if num_commands > 3:
 			session_3_command = args.commands[3]
-		remaining_commands    = args.commands[3:]
+		remaining_commands    = args.commands[4:]
 		self.vertically_split = args.v
 		logtimestep           = args.logtimestep
 		assert not args.v or session_2_command is None, 'BUG! Vertical arg should be off at this point if session_2 exists'
@@ -458,6 +457,8 @@ class PexpectSession(object):
 			string += '\noutput_lines_end_pane_pointer: ' + str(self.output_lines_end_pane_pointer)
 		if self.output_top_visible_line_index is not None:
 			string += '\noutput_top_visible_line_index: ' + str(self.output_top_visible_line_index)
+		for line in self.output_lines:
+			string += '\nline: ' + str(line.line_str)
 		if self.session_pane is not None:
 			string += '\nsession_pane: ' + str(self.session_pane)
 		string += '\n============= SESSION OBJECT END   ==================='
@@ -466,9 +467,11 @@ class PexpectSession(object):
 	def write_out_session_to_fit_pane(self):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
-		#self.pexpect_session_manager.debug_msg('In write_out_session_to_fit_pane for session: ' + str(self.pid))
 		if self.session_pane:
 			assert self.session_pane
+			#self.pexpect_session_manager.debug_msg('This session has a pane: ' + str(self.session_number))
+			#self.pexpect_session_manager.debug_msg(str(self))
+			#self.pexpect_session_manager.debug_msg('Pane name is: ' + str(self.session_pane.name))
 			width = self.session_pane.get_width()
 			height = self.session_pane.get_height()
 			lines_in_pane_str_arr  = []
@@ -484,6 +487,7 @@ class PexpectSession(object):
 			# Means: We don't know where are! This happens at the start.
 			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
 
+			#self.pexpect_session_manager.debug_msg('output lines: ')
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
 				if output_lines_cursor is None:
@@ -499,6 +503,7 @@ class PexpectSession(object):
 					last_time_seen = int(line_obj.time_seen)
 				# Strip whitespace at end, including \r\n
 				line = line_obj.line_str.rstrip()
+				#self.pexpect_session_manager.debug_msg('    ' + line)
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
 					# We are within the realm of the pane now
 					pane_line_counter = 0
