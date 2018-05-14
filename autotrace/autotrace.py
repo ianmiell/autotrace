@@ -15,19 +15,17 @@ if PY3:
     unicode = str
 
 # TODO: implement help
-# TODO: fix cycling windows
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
 # TODO: remove cursor (how?)
 # TODO: default to 'strace the last thing you ran'? see get_last_run_pid
 # TODO: define and stop run_time on pause
 # TODO: replay function?
-#       - add in timer to synchonise time
 #       - put elapsed time in before each line
 #       - replayer will 'just' read through the output files in the logs
 #       - replayer should therefore take 'replay' and 'logfolder' as an argument
 #       - it will work by, for each logfile:
 #         - start a autotrace process (because we know autotrace will be installed) that:
-#           - reads next line, gobble the time, wait that long and echo the line to stdout
+#           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
 
 class PexpectSessionManager(object):
@@ -79,7 +77,7 @@ class PexpectSessionManager(object):
 		if self.debug:
 			print(msg)
 		else:
-			self.write_to_logfile('DEBUG MESSAGE:\n' + msg)
+			self.write_to_manager_logfile('DEBUG MESSAGE:\n' + msg)
 		if pause:
 			time.sleep(pause)
 
@@ -96,7 +94,7 @@ class PexpectSessionManager(object):
 		assert self.wheight >= 24, self.quit_autotrace('Terminal not tall enough!')
 		assert self.wwidth >= 80, self.quit_autotrace('Terminal not wide enough!')
 
-	def write_to_logfile(self, msg):
+	def write_to_manager_logfile(self, msg):
 		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
@@ -242,8 +240,8 @@ class PexpectSessionManager(object):
 						self.quit_autotrace()
 				# TODO: redraw screen and show help
 			elif input_char:
-				self.write_to_logfile('input_char')
-				self.write_to_logfile(input_char)
+				self.write_to_manager_logfile('input_char')
+				self.write_to_manager_logfile(input_char)
 
 
 	# Handles initial placement of sessions and panes.
@@ -300,8 +298,7 @@ class PexpectSessionManager(object):
 
 
 	def do_layout(self, layout):
-		assert isinstance(layout, (str)), 'layout is of type: ' + str(type(layout))
-		assert isinstance(layout, (unicode)), 'layout is of type: ' + str(type(layout))
+		assert isinstance(layout, unicode), 'layout is of type: ' + str(type(layout))
 		main_session      = None
 		session_1         = None
 		session_2         = None
@@ -371,9 +368,9 @@ class PexpectSessionManager(object):
 	def debug_screen_array(self, screen_arr):
 		# TODO make this work?
 		x, y = 0, 0
-		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY============')
-		self.pexpect_sessions[0].write_to_logfile('height: ' + str(screen_arr.height))
-		self.pexpect_sessions[0].write_to_logfile('width: ' + str(screen_arr.width))
+		self.pexpect_sessions[0].write_to_manager_logfile('==========DEBUG SCREEN ARRAY============')
+		self.pexpect_sessions[0].write_to_manager_logfile('height: ' + str(screen_arr.height))
+		self.pexpect_sessions[0].write_to_manager_logfile('width: ' + str(screen_arr.width))
 		while y < screen_arr.height:
 			line = ''
 			while x < screen_arr.width:
@@ -386,9 +383,9 @@ class PexpectSessionManager(object):
 				else:
 					pass
 				x += 1
-			self.pexpect_sessions[0].write_to_logfile('line: ' + str(y) + line)
+			self.pexpect_sessions[0].write_to_manager_logfile('line: ' + str(y) + line)
 			y += 1
-		self.pexpect_sessions[0].write_to_logfile('==========DEBUG SCREEN ARRAY END============')
+		self.pexpect_sessions[0].write_to_manager_logfile('==========DEBUG SCREEN ARRAY END============')
 
 	def scroll_back(self):
 		# for each session: take the pointer, and move the _end_ pointer back to the output_top_visible_line_index - 1 and re-display
@@ -560,8 +557,9 @@ class PexpectSession(object):
 		if self.session_number == 0:
 			pexpect.run('kill -STOP ' + str(self.pid))
 
-	def write_to_logfile(self, msg):
-		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + str(msg) + '\n')
+	def write_to_session_logfile(self, msg, line_type):
+		assert isinstance(line_type,str)
+		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + line_type + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
 	def read_line(self):
@@ -572,18 +570,19 @@ class PexpectSession(object):
 			self.pexpect_session.expect('\r\n',timeout=self.pexpect_session_manager.timeout_delay)
 			string = self.pexpect_session.before.decode(self.encoding) + '\r\n'
 		except pexpect.EOF:
-			self.pexpect_session_manager.write_to_logfile('Command session: done ' + self.command)
+			self.pexpect_session_manager.write_to_manager_logfile('Command session: done ' + self.command)
 			self.pexpect_session = None
 		except pexpect.TIMEOUT:
 			# This is ok. Not logged for perf reasons
-			#self.pexpect_session_manager.write_to_logfile('Timeout in command session: ' + self.command)
+			#self.pexpect_session_manager.write_to_manager_logfile('Timeout in command session: ' + self.command)
 			pass
 		except Exception as eg:
-			self.pexpect_session_manager.write_to_logfile('Error in command session: ' + self.command)
-			self.pexpect_session_manager.write_to_logfile(eg)
+			self.pexpect_session_manager.write_to_manager_logfile('Error in command session: ' + self.command)
+			self.pexpect_session_manager.write_to_manager_logfile(eg)
 		if string:
-			self.write_to_logfile(string.strip())
-			self.append_output_line(string, 'program_output')
+			line_type = 'program_output'
+			self.write_to_session_logfile(string.strip(),line_type=line_type)
+			self.append_output_line(string, line_type)
 			return True
 		return False
 
@@ -685,6 +684,7 @@ def main():
 			if session.session_number == 0:
 				main_command_session = session
 			else:
+				pexpect_session_manager.debug_msg(str(pexpect_session_manager))
 				session.spawn()
 		assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
 		pexpect.run('kill -CONT ' + str(main_command_session.pid))
