@@ -425,7 +425,6 @@ class PexpectSessionManager(object):
 			process_time = pexpect.run('''(export TZ=UTC0; date -d "$(ps -o lstart= -p "''' + pid + '''") +%s)''')
 			# TODO: ignore the first one - that's a shell
 			# TODO: pick the highest - is it the root terminal
-			pass
 
 	def get_pane_by_session_number(self, session_number):
 		for session in self.pexpect_sessions:
