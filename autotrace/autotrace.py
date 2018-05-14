@@ -10,6 +10,10 @@ import curtsies
 from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, green, on_black, on_dark, on_red, on_green, on_yellow, on_blue, on_magenta, on_cyan, on_gray, bold, dark, underline, blink, invert, plain
 from curtsies.input import Input
 
+PY3 = sys.version_info[0] >= 3
+if PY3:
+    unicode = str
+
 # TODO: implement help
 # TODO: fix cycling windows
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
@@ -296,7 +300,8 @@ class PexpectSessionManager(object):
 
 
 	def do_layout(self, layout):
-		assert isinstance(layout, (str,unicode)), 'layout is of type: ' + str(type(layout))
+		assert isinstance(layout, (str)), 'layout is of type: ' + str(type(layout))
+		assert isinstance(layout, (unicode)), 'layout is of type: ' + str(type(layout))
 		main_session      = None
 		session_1         = None
 		session_2         = None
