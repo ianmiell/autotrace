@@ -121,7 +121,7 @@ class PexpectSessionManager(object):
 		new_panes = None
 
 	def draw_screen(self, draw_type, quick_help):
-		assert draw_type in ('sessions','help')
+		assert draw_type in ('sessions','help','clearscreen')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
 		header_text = 'Autotrace state: ' + invert(self.status) + ', ' + self.status_message
@@ -142,6 +142,10 @@ class PexpectSessionManager(object):
 					session.write_out_session_to_fit_pane()
 		elif draw_type == 'help':
 			self.draw_help()
+		elif draw_type == 'clearscreen':
+			for y in range(0,self.wheight):
+				line = ' '*self.wwidth
+				self.screen_arr[y:y+1,0:len(line)] = [line]
 		if not self.debug:
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
@@ -211,12 +215,17 @@ class PexpectSessionManager(object):
 		# TODO: zoom in and out, toggling on pane number - 1,2,3,4
 		#       zoom requires that layout is abstracted.
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
+		def refresh_screen():
+			self.draw_screen('clearscreen',quick_help=self.get_quick_help())
+			
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
 			if input_char:
 				self.write_to_manager_logfile('input_char: ' + input_char)
 			if input_char in quit_chars:
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
+			elif input_char in (u'r',):
+				refresh_screen()
 			elif input_char in (u'm',):
 				self.cycle_panes()
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
@@ -240,6 +249,10 @@ class PexpectSessionManager(object):
 				for e in input_generator:
 					if input_char in quit_chars:
 						self.quit_autotrace()
+					elif input_char in (u'r',):
+						refresh_screen()
+						self.status_message = 'you just refreshed ' + msg
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'c':
 						self.move_panes_to_tail()
 						self.unpause_sessions()
@@ -266,6 +279,10 @@ class PexpectSessionManager(object):
 					if e in quit_chars:
 						# TODO: maybe go back to running from here?
 						self.quit_autotrace()
+					elif input_char in (u'r',):
+						refresh_screen()
+						self.status_message = 'you just refreshed ' + msg
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'c':
 						self.unpause_sessions()
 						self.status = 'Running'
@@ -824,6 +841,7 @@ def main():
 					pexpect_session_manager.handle_sessions()
 					pexpect_session_manager.handle_input()
 			except KeyboardInterrupt:
+				pexpect_session_manager.draw_screen('clearscreen',quick_help=self.get_quick_help())
 				pexpect_session_manager.refresh_window()
 
 
