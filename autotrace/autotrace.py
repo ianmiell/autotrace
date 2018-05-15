@@ -134,12 +134,12 @@ class PexpectSessionManager(object):
 		if draw_type == 'sessions':
 			# Is there a zoomed session? Just write that one out.
 			if self.zoomed_session:
+				self.do_layout('zoomed')
 				self.zoomed_session.write_out_session_to_fit_pane()
 			else:
+				self.do_layout('default')
 				for session in self.pexpect_sessions:
 					session.write_out_session_to_fit_pane()
-			for session in self.pexpect_sessions:
-				session.write_out_session_to_fit_pane()
 		elif draw_type == 'help':
 			self.draw_help()
 		if not self.debug:
@@ -229,8 +229,9 @@ class PexpectSessionManager(object):
 				for session in self.pexpect_sessions:
 					if session.session_number == int(input_char):
 						self.zoomed_session = session
+				assert self.zoomed_session
 				# Redraw screen
-				self.draw_screen('sessions',quick_help=self.get_quick_help())
+				self.draw_screen('sessions',quick_help=self.get_quick_help() + 'ZOOM')
 			elif input_char in (u'p',):
 				# Handle paused state
 				self.status = 'Paused'
@@ -331,7 +332,7 @@ class PexpectSessionManager(object):
 		assert isinstance(layout, unicode), 'layout is of type: ' + str(type(layout))
 		if layout == 'default':
 			self.do_layout_default()
-		elif layout == 'default':
+		elif layout == 'zoomed':
 			self.do_layout_zoomed()
 		else:
 			assert False, 'do_layout: ' + layout + ' not handled'
