@@ -89,9 +89,9 @@ class PexpectSessionManager(object):
 		self.wwidth               = self.window.width
 		# Divide the screen up into two, to keep it simple for now
 		self.wheight_top_end	  = int(self.wheight / 2)
-		self.wheight_bottom_start = int(self.wheight / 2) + 1
+		self.wheight_bottom_start = int(self.wheight / 2)
 		self.wwidth_left_end	  = int(self.wwidth / 2)
-		self.wwidth_right_start   = int(self.wwidth / 2) + 1
+		self.wwidth_right_start   = int(self.wwidth / 2)
 		assert self.wheight >= 24, self.quit_autotrace('Terminal not tall enough!')
 		assert self.wwidth >= 80, self.quit_autotrace('Terminal not wide enough!')
 
@@ -389,12 +389,12 @@ class PexpectSessionManager(object):
 			if self.vertically_split:
 				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			else:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start)
 		else:
 			# At least 3 sessions (4 including main), so set up main session in top left...
-			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
+			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start)
 			# ... and then session 3 setup in top right.
-			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start)
 		if session_2 is None:
 			# Two panes only, so are we vertically split?
 			if self.vertically_split:
