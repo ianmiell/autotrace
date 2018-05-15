@@ -123,12 +123,12 @@ class PexpectSessionManager(object):
 		assert draw_type in ('sessions','help')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
-		header_text = 'Autotrace state: ' + self.status + ' ... ' + self.status_message
+		header_text = invert('Autotrace state: ' + self.status + ' ... ' + self.status_message)
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
-		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
-		footer_text = self.status + space + quick_help
-		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
+		space =  (self.wwidth - len(quick_help))*' '
+		footer_text = space + quick_help
+		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [invert(blue(footer_text))]
 		# Draw the sessions.
 		if draw_type == 'sessions':
 			# Is there a zoomed session? Just write that one out.
@@ -333,7 +333,6 @@ class PexpectSessionManager(object):
 
 	def do_layout_zoomed(self):
 		assert self.zoomed_session
-		# TODO: which session is zoomed? Give that one the whole screen
 		zoomed_session = None
 		for session in self.pexpect_sessions:
 			if session == self.zoomed_session:
@@ -512,7 +511,8 @@ class PexpectSession(object):
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
-			height = self.session_pane.get_height()
+			# We reserve one row at the end as a pane status line
+			height = self.session_pane.get_height() - 1
 			lines_in_pane_str_arr  = []
 			last_time_seen         = None
 			output_lines_cursor    = None
@@ -563,13 +563,26 @@ class PexpectSession(object):
 					if pane_line_counter > height - 1:
 						break
 			output_lines_end_pane_pointer_has_been_set = False
-			for i, line in zip(reversed(range(self.session_pane.top_left_y,self.session_pane.bottom_right_y)), reversed(lines_in_pane_str_arr)):
-				self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
+			# Add a status line in the pane
+			if lines_in_pane_str_arr and len(lines_in_pane_str_arr) > 0:
+				lines_in_pane_str_arr.append(['Pane no: ' + str(self.session_number) + ', command: ' + self.command ,output_lines_cursor+1])
+			top_y    = self.session_pane.top_left_y
+			bottom_y = self.session_pane.bottom_right_y
+			for i, line in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
+				# Status on bottom line
+				self.pexpect_session_manager.debug_msg('i: ' + str(i) +  ', height: ' + str(height) + ', top_y: ' + str(top_y) + ', line: ' + str(line))
+				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
+				# OR If this is on the bottom (ie top_y is not 1), and height + top_y == i
+				if (top_y == 1 and height + top_y == i) or (top_y != 1 and height + top_y == i):
+					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [invert(cyan(line[0]))]
+				else:
+					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
 				if not output_lines_end_pane_pointer_has_been_set:
 					self.output_lines_end_pane_pointer = line[1]
 					output_lines_end_pane_pointer_has_been_set = True
 				# Record the uppermost-visible line
 				self.output_top_visible_line_index = line[1]
+			self.pexpect_session_manager.debug_msg('=========')
 
 	def spawn(self):
 		self.pexpect_session = pexpect.spawn(self.command)
