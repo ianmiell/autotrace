@@ -1,1 +1,2 @@
+#!/bin/bash
 python autotrace/autotrace.py --logtimestep -l . 'bash -c "var=0; while true; do let "var++"; echo ${var}-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; sleep 0.5; done"' 'bash -c "while true; do echo b; sleep 1; done"' 'bash -c "while true; do echo c; sleep 1; done"' 'bash -c "while true; do echo d; sleep 1; done"' 'bash -c "while true; do echo e; sleep 1; done"'
