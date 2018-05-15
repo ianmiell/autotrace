@@ -140,7 +140,6 @@ class PexpectSessionManager(object):
 				self.do_layout('zoomed')
 				self.zoomed_session.write_out_session_to_fit_pane()
 			else:
-				self.do_layout('default')
 				for session in self.pexpect_sessions:
 					session.write_out_session_to_fit_pane()
 		elif draw_type == 'help':
