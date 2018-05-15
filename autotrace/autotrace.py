@@ -568,7 +568,6 @@ class PexpectSession(object):
 			bottom_y = self.session_pane.bottom_right_y
 			for i, line in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
 				# Status on bottom line
-				self.pexpect_session_manager.debug_msg('i: ' + str(i) +  ', height: ' + str(height) + ', top_y: ' + str(top_y) + ', line: ' + str(line))
 				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
 				# OR If this is on the bottom (ie top_y is not 1), and height + top_y == i
 				if (top_y == 1 and height + top_y == i) or (top_y != 1 and height + top_y == i):
@@ -580,7 +579,6 @@ class PexpectSession(object):
 					output_lines_end_pane_pointer_has_been_set = True
 				# Record the uppermost-visible line
 				self.output_top_visible_line_index = line[1]
-			self.pexpect_session_manager.debug_msg('=========')
 
 	def spawn(self):
 		self.pexpect_session = pexpect.spawn(self.command)
