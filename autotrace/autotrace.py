@@ -102,7 +102,7 @@ class PexpectSessionManager(object):
 	def cycle_panes(self):
 		# Must have more than 4 panes to do a cycle (including main command)
 		if len(self.pexpect_sessions) <= 4:
-			return False
+			return
 		# eg we have 1, 2, 3, 4, 5
 		# cycling: #   1 => 5 #   5 => 4 #   1 => 3 #   3 => 2 #   2 => 1
 		# Get the pane of session number (using function get_pane_by_session_number)
@@ -124,7 +124,10 @@ class PexpectSessionManager(object):
 		assert draw_type in ('sessions','help','clearscreen')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
-		header_text = 'Autotrace state: ' + invert(self.status) + ', ' + self.status_message
+		if self.status_message:
+			header_text = 'Autotrace state: ' + invert(self.status) + ', ' + self.status_message
+		else:
+			header_text = 'Autotrace state: ' + invert(self.status)
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
 		space = (self.wwidth - len(quick_help))*' '
@@ -200,24 +203,24 @@ class PexpectSessionManager(object):
 				else:
 					zoom_str += str(i)
 			if number_of_sessions > 4:
-				quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
+				if self.zoomed_session:
+					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, m: cycle windows, z: zoom out, h: help =>  '
+				else:
+					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, m: cycle windows, ' + zoom_str + ': zoom, h: help =>  '
 			else:
-				quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, h: help =>  '
+				quick_help = 'q/ESC/C-d: quit, p: pause, r: refresh, h: help =>  '
 		elif self.status == 'Paused':
-			quick_help = 'q/ESC/C-d: quit, c: continue running, f: page forward, b: page back, h: help =>  '
+			quick_help = 'q/ESC/C-d: quit, c: continue running, f: page forward, b: page back, r: refresh, h: help =>  '
 		elif self.status == 'Help':
-			quick_help = 'q/ESC/C-d: quit, c: continue running =>  '
+			quick_help = 'q/ESC/C-d: quit, c: continue running, r: refresh =>  '
 		return quick_help
 
 
 
 	def handle_input(self):
-		# TODO: zoom in and out, toggling on pane number - 1,2,3,4
-		#       zoom requires that layout is abstracted.
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		def refresh_screen():
-			self.draw_screen('clearscreen',quick_help=self.get_quick_help())
-			
+			self.draw_screen('clearscreen',quick_help='')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
 			if input_char:
@@ -251,7 +254,7 @@ class PexpectSessionManager(object):
 						self.quit_autotrace()
 					elif input_char in (u'r',):
 						refresh_screen()
-						self.status_message = 'you just refreshed ' + msg
+						self.status_message = 'you just refreshed'
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'c':
 						self.move_panes_to_tail()
@@ -638,7 +641,7 @@ class PexpectSession(object):
 			pexpect.run('kill -STOP ' + str(self.pid))
 
 	def write_to_session_logfile(self, msg, line_type):
-		assert isinstance(line_type,str)
+		assert isinstance(line_type,str) or isinstance(line_type,unicode) # python is lazy
 		self.logfile.write(self.pexpect_session_manager.get_elapsed_time_str() + ' ' + line_type + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
@@ -781,9 +784,9 @@ def get_last_run_pid(encoding='utf-8'):
 			assert int(pid), 'pid is not an integer: ' + str(pid)
 			pids.append(pid)
 	if pids != []:
-	        # TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
-	        # TODO: ask user whether they want to kill the process or
-	        return pids[-1]
+		# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
+		# TODO: ask user whether they want to kill the process or
+		return pids[-1]
 	return None
 	# THEN LOOK FOR 'OTHER' JOBS BY THIS USER?
 	#ps_command = 'ps -o pid=,comm='
@@ -841,7 +844,7 @@ def main():
 					pexpect_session_manager.handle_sessions()
 					pexpect_session_manager.handle_input()
 			except KeyboardInterrupt:
-				pexpect_session_manager.draw_screen('clearscreen',quick_help=self.get_quick_help())
+				pexpect_session_manager.draw_screen('clearscreen',quick_help=pexpect_session_manager.get_quick_help())
 				pexpect_session_manager.refresh_window()
 
 
