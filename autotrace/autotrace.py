@@ -219,8 +219,6 @@ class PexpectSessionManager(object):
 
 	def handle_input(self):
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
-		def refresh_screen():
-			self.draw_screen('clearscreen',quick_help='')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
 			if input_char:
@@ -228,8 +226,8 @@ class PexpectSessionManager(object):
 			if input_char in quit_chars:
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'r',):
-				refresh_screen()
-			elif input_char in (u'm',) and self.zoomed_session is None:
+				self.draw_screen('clearscreen',quick_help=self.get_quick_help())
+			elif input_char in (u'm',):
 				self.cycle_panes()
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'z',):
@@ -253,8 +251,8 @@ class PexpectSessionManager(object):
 					if input_char in quit_chars:
 						self.quit_autotrace()
 					elif input_char in (u'r',):
-						refresh_screen()
-						self.status_message = 'you just refreshed'
+						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
+						self.status_message = 'you just refreshed ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'c':
 						self.move_panes_to_tail()
@@ -283,7 +281,7 @@ class PexpectSessionManager(object):
 						# TODO: maybe go back to running from here?
 						self.quit_autotrace()
 					elif input_char in (u'r',):
-						refresh_screen()
+						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
 						self.status_message = 'you just refreshed ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'c':
@@ -827,6 +825,20 @@ def main():
 			except KeyboardInterrupt:
 				pexpect_session_manager.draw_screen('clearscreen',quick_help=pexpect_session_manager.get_quick_help())
 				pexpect_session_manager.refresh_window()
+
+################################################################################
+# Basic flow of application
+################################################################################
+# draw_screen
+# 	do_layout
+# 		do_layout_default (or _zoomed)
+# 	for each session that is displayed:
+# 		write_out_session_to_fit_pane
+# handle_sessions
+# 	reads lines from pexpect sessions
+# handle_input
+# 	(can also) draw_screen
+################################################################################
 
 
 autotrace_version='0.0.8'
