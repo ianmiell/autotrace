@@ -204,7 +204,7 @@ class PexpectSessionManager(object):
 					zoom_str += str(i)
 			if number_of_sessions > 4:
 				if self.zoomed_session:
-					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, m: cycle windows, z: zoom out, h: help =>  '
+					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, z: zoom out, h: help =>  '
 				else:
 					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, m: cycle windows, ' + zoom_str + ': zoom, h: help =>  '
 			else:
@@ -229,7 +229,7 @@ class PexpectSessionManager(object):
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'r',):
 				refresh_screen()
-			elif input_char in (u'm',):
+			elif input_char in (u'm',) and self.zoomed_session is None:
 				self.cycle_panes()
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'z',):
