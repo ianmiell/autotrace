@@ -7,7 +7,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 setup(
     name='autotrace',
- version='0.0.20',
+ version='0.0.21',
     description='Telemetry on any command',
     author='Ian Miell',
     author_email='ian.miell@gmail.com',
