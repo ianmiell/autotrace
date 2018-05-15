@@ -202,7 +202,6 @@ class PexpectSessionManager(object):
 
 
 	def handle_input(self):
-		quick_help = self.get_quick_help()
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
@@ -249,7 +248,6 @@ class PexpectSessionManager(object):
 					else:
 						self.write_to_manager_logfile('input_char: ' + input_char)
 			elif input_char in (u'h',):
-				quick_help = 'ESC/q: quit, c: continue running =>  '
 				# Handle help state
 				self.status = 'Help'
 				# Default is to pause sessions here - good idea?
@@ -564,14 +562,14 @@ class PexpectSession(object):
 						break
 			output_lines_end_pane_pointer_has_been_set = False
 			# Add a status line in the pane
-			if lines_in_pane_str_arr and len(lines_in_pane_str_arr) > 0:
+			if lines_in_pane_str_arr:
 				lines_in_pane_str_arr.append(['Pane no: ' + str(self.session_number) + ', command: ' + self.command ,output_lines_cursor+1])
 			top_y    = self.session_pane.top_left_y
 			bottom_y = self.session_pane.bottom_right_y
 			for i, line in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
 				# Status on bottom line
 				self.pexpect_session_manager.debug_msg('i: ' + str(i) +  ', height: ' + str(height) + ', top_y: ' + str(top_y) + ', line: ' + str(line))
-				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
+				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
 				# OR If this is on the bottom (ie top_y is not 1), and height + top_y == i
 				if (top_y == 1 and height + top_y == i) or (top_y != 1 and height + top_y == i):
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [invert(cyan(line[0]))]
@@ -742,10 +740,9 @@ def get_last_run_pid(encoding='utf-8'):
 			pids.append(pid)
 	if pids != []:
 		# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
-		# TODO: ask user whether they want to kill the process or 
+		# TODO: ask user whether they want to kill the process or
 		return pids[-1]
-	else:
-		return None
+	return None
 
 	# THEN LOOK FOR 'OTHER' JOBS BY THIS USER?
 	#ps_command = 'ps -o pid=,comm='
@@ -763,7 +760,7 @@ def get_last_run_pid(encoding='utf-8'):
 	#	pids.append(pid)
 	## TODO: not working on mac (wrong date binary)
 	## TODO: use jobs to find background commands. foreground it if necessary
-	## TODO: if no background command, 
+	## TODO: if no background command,
 	#date_command = 'date'
 	#times = {}
 	#for pid in pids:
