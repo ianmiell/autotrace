@@ -181,6 +181,8 @@ class PexpectSessionManager(object):
 				quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
 		elif self.status == 'Paused':
 			quick_help = 'ESC/q: quit, c: continue running, f: page forward, b: page back, h: help =>  '
+		elif self.status == 'Help':
+			quick_help = 'c: continue running =>  '
 		return quick_help
 
 
