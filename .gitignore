@@ -10,3 +10,4 @@ env
 .idea/
 *.log
 doc/sphinx/build/*
+autotrace.egg*
