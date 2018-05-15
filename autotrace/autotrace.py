@@ -149,6 +149,10 @@ class PexpectSessionManager(object):
 		help_text_lines = self.get_state_for_user().split('\n')
 		i=2
 		for line in help_text_lines:
+			while len(line) > self.wwidth-1:
+				line = line[:self.wwidth-1]
+				self.screen_arr[i:i+1,0:len(line)] = [green(line)]
+				i += 1
 			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
 			i += 1
 
@@ -156,6 +160,7 @@ class PexpectSessionManager(object):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
 		print(msg + self.get_state_for_user())
+		sys.exit(0)
 
 	def get_state_for_user(self):
 		msg = '\nLogs and output in: ' + self.logdir
