@@ -357,6 +357,7 @@ class PexpectSessionManager(object):
 			assert False, 'do_layout: ' + layout + ' not handled'
 
 	def do_layout_zoomed(self):
+		# TODO: maybe do this 'properly' and set the pane's positions and visibility fully, and revert to previous when done.
 		assert self.zoomed_session
 		zoomed_session = None
 		for session in self.pexpect_sessions:
@@ -387,7 +388,7 @@ class PexpectSessionManager(object):
 			if self.vertically_split:
 				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			else:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_ottom_start-1)
 		else:
 			# At least 3 sessions (4 including main), so set up main session in top left...
 			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
@@ -477,35 +478,11 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			session.output_lines_end_pane_pointer = len(session.output_lines)-1
 
-	def get_last_run_pid(self):
-		ps_output=pexpect.run('ps -o pid=,command= | grep -v "ps -o pid=,command="').decode(self.encoding)
-		pids = []
-		for l in ps_output.split('\r\n'):
-			pid = l.split(' ')[0]
-			assert int(pid), 'pid is not an integer: ' + str(pid)
-			pids.append(pid)
-		for pid in pids:
-			process_time = pexpect.run('''(export TZ=UTC0; date -d "$(ps -o lstart= -p "''' + pid + '''") +%s)''')
-			# TODO: ignore the first one - that's a shell
-			# TODO: pick the highest - is it the root terminal
-
 	def get_pane_by_session_number(self, session_number):
 		for session in self.pexpect_sessions:
 			if session.session_number == session_number:
 				return session.session_pane
 		return None
-
-	def get_last_run_pid(self):
-		ps_output=pexpect.run('ps -o pid=,command= | grep -v "ps -o pid=,command="').decode(self.encoding)
-		pids = []
-		for l in ps_output.split('\r\n'):
-			pid = l.split(' ')[0]
-			assert int(pid), 'pid is not an integer: ' + str(pid)
-			pids.append(pid)
-		for pid in pids:
-			process_time = pexpect.run('''(export TZ=UTC0; date -d "$(ps -o lstart= -p "''' + pid + '''") +%s)''')
-			# TODO: ignore the first one - that's a shell
-			# TODO: pick the highest - is it the root terminal
 
 
 class PexpectSession(object):
