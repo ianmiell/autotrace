@@ -14,7 +14,6 @@ PY3 = sys.version_info[0] >= 3
 if PY3:
 	unicode = str
 
-# TODO: implement help
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
 # TODO: remove cursor (how?)
 # TODO: default to 'strace the last thing you ran'? see get_last_run_pid
