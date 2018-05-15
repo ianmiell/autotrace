@@ -17,7 +17,6 @@ if PY3:
 # TODO: implement help
 # TODO: status bar per pane, toggle for showing commands in panes, highlight
 # TODO: remove cursor (how?)
-# TODO: default to 'strace the last thing you ran'? see get_last_run_pid
 # TODO: replay function?
 #       - put elapsed time in before each line
 #       - replayer will 'just' read through the output files in the logs
@@ -41,6 +40,7 @@ class PexpectSessionManager(object):
 		self.pid                  = os.getpid()
 		self.timeout_delay        = 0.001
 		self.encoding             = encoding
+		self.zoomed_session       = None
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -123,7 +123,7 @@ class PexpectSessionManager(object):
 		assert draw_type in ('sessions','help')
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		# Header
-		header_text = 'autotrace running... ' + self.status_message
+		header_text = 'Autotrace state: ' + self.status + ' ... ' + self.status_message
 		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
 		# Footer
 		space =  (self.wwidth - (len(self.status) + len(quick_help)))*' '
@@ -131,15 +131,21 @@ class PexpectSessionManager(object):
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [blue(footer_text)]
 		# Draw the sessions.
 		if draw_type == 'sessions':
-			for session in self.pexpect_sessions:
-				session.write_out_session_to_fit_pane()
+			# Is there a zoomed session? Just write that one out.
+			if self.zoomed_session:
+				self.do_layout('zoomed')
+				self.zoomed_session.write_out_session_to_fit_pane()
+			else:
+				self.do_layout('default')
+				for session in self.pexpect_sessions:
+					session.write_out_session_to_fit_pane()
 		elif draw_type == 'help':
 			self.draw_help()
 		if not self.debug:
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
 	def draw_help(self):
-		help_text_lines = ['Placeholder text',]
+		help_text_lines = self.get_state_for_user().split('\n')
 		i=2
 		for line in help_text_lines:
 			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
@@ -148,13 +154,16 @@ class PexpectSessionManager(object):
 	def quit_autotrace(self, msg='All done.'):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
+		print(msg + self.get_state_for_user())
+		sys.exit(0)
+
+	def get_state_for_user(self):
 		# leave useful message
-		msg += '\nLogs and output in: ' + self.logdir
+		msg = '\nLogs and output in: ' + self.logdir
 		msg += '\nCommands were: '
 		for session in self.pexpect_sessions:
 			msg += '\n\t' + session.command
-		print(msg)
-		sys.exit(0)
+		return msg
 
 	def handle_sessions(self):
 		seen_output = False
@@ -175,21 +184,24 @@ class PexpectSessionManager(object):
 	def get_quick_help(self):
 		if self.status == 'Running':
 			number_of_sessions = len(self.pexpect_sessions)
+			zoom_str = ''
+			for i in range(0,number_of_sessions):
+				if i > 0:
+					zoom_str += ',' + str(i)
+				else:
+					zoom_str += str(i)
 			if number_of_sessions > 4:
-				quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
+				quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, ' + zoom_str + ': zoom, z: zoom out, h: help =>  '
 			else:
-				quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
+				quick_help = 'ESC/q: quit, p: pause, c: continue, ' + zoom_str + ' zoom, z: zoom out, h: help =>  '
 		elif self.status == 'Paused':
-			quick_help = 'ESC/q: quit, c: continue running, f: page forward, b: page back, h: help =>  '
+			quick_help = 'ESC/q: quit, c: continue running, f: page forward, b: page back =>  '
 		elif self.status == 'Help':
 			quick_help = 'c: continue running =>  '
 		return quick_help
 
 
-
 	def handle_input(self):
-		# TODO: zoom in and out, toggling on pane number - 1,2,3,4
-		#       zoom requires that layout is abstracted.
 		quick_help = self.get_quick_help()
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		with Input() as input_generator:
@@ -200,6 +212,17 @@ class PexpectSessionManager(object):
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'm',):
 				self.cycle_panes()
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
+			elif input_char in (u'z',):
+				# Revert layout status from zoomed
+				self.zoomed_session = None
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
+			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
+				# Set session as zoomed.
+				for session in self.pexpect_sessions:
+					if session.session_number == int(input_char):
+						self.zoomed_session = session
+				# Redraw screen
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'p',):
 				# Handle paused state
@@ -234,7 +257,7 @@ class PexpectSessionManager(object):
 				self.draw_screen('help',quick_help=self.get_quick_help())
 				for e in input_generator:
 					if e in quit_chars:
-						# TODO: maybe go back to running from here?
+						# TODO: maybe go back to running from here?
 						self.quit_autotrace()
 					elif e == 'c':
 						self.unpause_sessions()
@@ -300,6 +323,27 @@ class PexpectSessionManager(object):
 
 	def do_layout(self, layout):
 		assert isinstance(layout, unicode), 'layout is of type: ' + str(type(layout))
+		if layout == 'default':
+			self.do_layout_default()
+		elif layout == 'zoomed':
+			self.do_layout_zoomed()
+		else:
+			assert False, 'do_layout: ' + layout + ' not handled'
+
+
+	def do_layout_zoomed(self):
+		assert self.zoomed_session
+		# TODO: which session is zoomed? Give that one the whole screen
+		zoomed_session = None
+		for session in self.pexpect_sessions:
+			if session == self.zoomed_session:
+				zoomed_session = session
+				break
+		assert zoomed_session
+		zoomed_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+
+
+	def do_layout_default(self):
 		main_session      = None
 		session_1         = None
 		session_2         = None
@@ -315,34 +359,28 @@ class PexpectSessionManager(object):
 				session_3    = session
 		assert main_session is not None and session_1 is not None
 
-		if layout == 'default':
-			if session_3 is None:
-				# Two panes only, so are we vertically split?
-				if self.vertically_split:
-					main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
-				else:
-					main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+		if session_3 is None:
+			# Two panes only, so are we vertically split?
+			if self.vertically_split:
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			else:
-				# At least 3 sessions (4 including main), so set up main session in top left...
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
-				# ... and then session 3 setup in top right.
-				session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
-			if session_2 is None:
-				# Two panes only, so are we vertically split?
-				if self.vertically_split:
-					session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
-				else:
-					session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
-			else:
-				# At least 2 sessions (3 including main), so set up second session in bottom left...
-				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
-				# ... and then session 3 in bottom right.
-				session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
-		elif layout == 'zoom':
-			# TODO: handle zooming, eg if layout == 'zoomed':
-			pass
+				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
 		else:
-			assert False, 'do_layout: ' + layout + ' not handled'
+			# At least 3 sessions (4 including main), so set up main session in top left...
+			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start-1)
+			# ... and then session 3 setup in top right.
+			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start-1)
+		if session_2 is None:
+			# Two panes only, so are we vertically split?
+			if self.vertically_split:
+				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+			else:
+				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+		else:
+			# At least 2 sessions (3 including main), so set up second session in bottom left...
+			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+			# ... and then session 3 in bottom right.
+			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 
 	def pause_sessions(self):
@@ -415,18 +453,6 @@ class PexpectSessionManager(object):
 	def move_panes_to_tail(self):
 		for session in self.pexpect_sessions:
 			session.output_lines_end_pane_pointer = len(session.output_lines)-1
-
-	def get_last_run_pid(self):
-		ps_output=pexpect.run('ps -o pid=,command= | grep -v "ps -o pid=,command="').decode(self.encoding)
-		pids = []
-		for l in ps_output.split('\r\n'):
-			pid = l.split(' ')[0]
-			assert int(pid), 'pid is not an integer: ' + str(pid)
-			pids.append(pid)
-		for pid in pids:
-			process_time = pexpect.run('''(export TZ=UTC0; date -d "$(ps -o lstart= -p "''' + pid + '''") +%s)''')
-			# TODO: ignore the first one - that's a shell
-			# TODO: pick the highest - is it the root terminal
 
 	def get_pane_by_session_number(self, session_number):
 		for session in self.pexpect_sessions:
@@ -648,22 +674,95 @@ def process_args():
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
-	if args.commands == [] and args.replayfile is None:
-		print('You must supply either a command or a replayfile')
-		parser.print_help(sys.stdout)
-		sys.exit(1)
+	#if args.commands == [] and args.replayfile is None:
+	#	print('You must supply either a command or a replayfile')
+	#	parser.print_help(sys.stdout)
+	#	sys.exit(1)
 	if isinstance(args.commands,str):
 		args.commands = [args.commands]
 	if args.v and len(args.commands) > 2:
 		print('-v and more than two commands supplied. -v does not make sense, so dropping that arg.')
 		args.v = False
 		time.sleep(1)
+	if args.commands == [] and not args.replayfile:
+		pid = get_last_run_pid()
+		if pid:
+			print(str(pid))
+		else:
+			print('No pid found')
+			sys.exit(0)
 	return args
 
 
 def replace_pid(string, pid_str):
 	assert isinstance(pid_str, str)
 	return string.replace('PID', pid_str)
+
+def get_last_run_pid(encoding='utf-8'):
+	# GET CURRENT TTY: tty | sed 's/^.dev.\(.*\)/\1/'
+
+	# Get all processes with a tty
+
+	# Check stopped jobs first CTRL-Z
+	jobs_command = 'jobs -p -s'
+	ps_output  = pexpect.run(jobs_command).decode(encoding)
+	print(ps_output)
+	pids       = []
+	for l in ps_output.split('\r\n'):
+		pid = l.split(' ')[0].strip()
+		if pid == '':
+			continue
+		print(pid)
+		assert int(pid), 'pid is not an integer: ' + str(pid)
+		pids.append(pid)
+	if pids == []:
+		# Then look for running jobs
+		jobs_command = 'jobs -p -r'
+		ps_output  = pexpect.run(jobs_command).decode(encoding)
+		print(ps_output)
+		pids       = []
+		for l in ps_output.split('\r\n'):
+			pid = l.split(' ')[0].strip()
+			if pid == '':
+				continue
+			assert int(pid), 'pid is not an integer: ' + str(pid)
+			pids.append(pid)
+	if pids != []:
+		# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
+		# TODO: ask user whether they want to kill the process or 
+		return pids[-1]
+	else:
+		return None
+
+	# THEN LOOK FOR 'OTHER' JOBS BY THIS USER?
+	#ps_command = 'ps -o pid=,comm='
+	#ps_output  = pexpect.run(ps_command).decode(encoding)
+	#pids       = []
+	#for l in ps_output.split('\r\n'):
+	#	# TODO If line contains ps_command, ignore
+	#	if l.find(ps_command) != -1:
+	#		continue
+	#	print(l)
+	#	pid = l.split(' ')[0].strip()
+	#	if pid == '':
+	#		continue
+	#	assert int(pid), 'pid is not an integer: ' + str(pid)
+	#	pids.append(pid)
+	## TODO: not working on mac (wrong date binary)
+	## TODO: use jobs to find background commands. foreground it if necessary
+	## TODO: if no background command, 
+	#date_command = 'date'
+	#times = {}
+	#for pid in pids:
+	#	command = """bash -c '(export TZ=UTC0; export LC_ALL=C; date -d "$(ps -o start= -p '""" + pid + """')" +%s)'"""
+	#	print(command)
+	#	process_time_s = pexpect.run(command).decode(encoding).strip()
+	#	if process_time_s[:5] == 'usage':
+	#		# TODO: handle mac
+	#		print('asd')
+	#	assert int(process_time_s)
+	#	times.update({process_time_s:pid})
+	#	# TODO: order by time, remove first one (the shell), pick the last one
 
 
 def main():
