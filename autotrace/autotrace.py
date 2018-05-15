@@ -132,6 +132,12 @@ class PexpectSessionManager(object):
 		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [invert(blue(footer_text))]
 		# Draw the sessions.
 		if draw_type == 'sessions':
+			# Is there a zoomed session? Just write that one out.
+			if self.zoomed_session:
+				self.zoomed_session.write_out_session_to_fit_pane()
+			else:
+				for session in self.pexpect_sessions:
+					session.write_out_session_to_fit_pane()
 			for session in self.pexpect_sessions:
 				session.write_out_session_to_fit_pane()
 		elif draw_type == 'help':
