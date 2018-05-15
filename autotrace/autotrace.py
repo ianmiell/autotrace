@@ -195,13 +195,13 @@ class PexpectSessionManager(object):
 				else:
 					zoom_str += str(i)
 			if number_of_sessions > 4:
-				quick_help = 'ESC/q: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
+				quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, m: cycle windows, h: help =>  '
 			else:
-				quick_help = 'ESC/q: quit, p: pause, c: continue, h: help =>  '
+				quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, h: help =>  '
 		elif self.status == 'Paused':
-			quick_help = 'ESC/q: quit, c: continue running, f: page forward, b: page back, h: help =>  '
+			quick_help = 'q/ESC/C-d: quit, c: continue running, f: page forward, b: page back, h: help =>  '
 		elif self.status == 'Help':
-			quick_help = 'c: continue running =>  '
+			quick_help = 'q/ESC/C-d: quit, c: continue running =>  '
 		return quick_help
 
 
