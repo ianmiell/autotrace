@@ -152,6 +152,7 @@ class PexpectSessionManager(object):
 			while len(line) > self.wwidth-1:
 				line = line[:self.wwidth-1]
 				self.screen_arr[i:i+1,0:len(line)] = [green(line)]
+				line = line[self.wwidth:]
 				i += 1
 			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
 			i += 1
