@@ -185,6 +185,7 @@ class PexpectSessionManager(object):
 				if session.read_line():
 					seen_output = True
 					lines_seen.update({session:True})
+		#time.sleep(1)
 		# Determine which ones saw output.
 		# The ones that did not need to 'fake read' a line of type 'display_sync_line'
 		assert seen_output
@@ -537,7 +538,7 @@ class PexpectSession(object):
 			assert self.session_pane
 			width = self.session_pane.get_width()
 			# We reserve one row at the end as a pane status line
-			height = self.session_pane.get_height() - 1
+			available_pane_height = self.session_pane.get_height() - 1
 			lines_in_pane_str_arr  = []
 			last_time_seen         = None
 			output_lines_cursor    = None
@@ -550,7 +551,6 @@ class PexpectSession(object):
 				pass
 			# Means: We don't know where are! This happens at the start.
 			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
-
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
 				if output_lines_cursor is None:
@@ -569,28 +569,34 @@ class PexpectSession(object):
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
 					# We are within the realm of the pane now
 					pane_line_counter = 0
+				
 				break_at_end_of_this_line = False
-				while len(line) > width-1:
-					# When we get to the top visible line index, kick off the
-					# counter and up one for each pane line computed.
-					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
-					line = line[width-1:]
-					if pane_line_counter is not None:
-						pane_line_counter += 1
-						if pane_line_counter > height - 1:
-							# Make sure we finish this line, so iterate until done!
-							break_at_end_of_this_line = True
+				# If line is so long that it's going to take over the end of the pane, then bail.
+				# If the pane_line_counter + the number of lines that this line will take up
+				if pane_line_counter and pane_line_counter+((len(line)/width-1)+1) > available_pane_height - 1:
+					break
+				else:
+					while len(line) > width-1:
+						# When we get to the top visible line index, kick off the
+						# counter and up one for each pane line computed.
+						lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
+						line = line[width-1:]
+						if pane_line_counter:
+							pane_line_counter += 1
+							if pane_line_counter > available_pane_height - 1:
+								# Make sure we finish this line, so iterate until done!
+								break_at_end_of_this_line = True
 				if break_at_end_of_this_line:
 					break
+				# Add the remainder of this line.
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
-				if pane_line_counter is not None:
+				if pane_line_counter:
 					pane_line_counter += 1
-					if pane_line_counter > height - 1:
-						break
+				if pane_line_counter and pane_line_counter > available_pane_height - 1:
+					break
 			output_lines_end_pane_pointer_has_been_set = False
 			# Add a status line in the pane
 			if lines_in_pane_str_arr:
-				#lines_in_pane_str_arr.append(['Pane no: ' + str(self.session_number) + ', command: ' + self.command[:self.session_pane.get_width()-1],output_lines_cursor+1])
 				line_str = 'Pane no: ' + str(self.session_number) + ', command: ' + self.command
 				line_str = line_str[:self.session_pane.get_width()]
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor+1])
@@ -600,7 +606,7 @@ class PexpectSession(object):
 				# Status on bottom line
 				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
 				# OR If this is on the bottom (ie top_y is not 1), and height + top_y == i
-				if (top_y == 1 and height + top_y == i) or (top_y != 1 and height + top_y == i):
+				if (top_y == 1 and available_pane_height + top_y == i) or (top_y != 1 and available_pane_height + top_y == i):
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [cyan(invert(line[0]))]
 				else:
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
