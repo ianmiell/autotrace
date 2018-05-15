@@ -149,7 +149,7 @@ class PexpectSessionManager(object):
 	def quit_autotrace(self, msg='All done.'):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
-		print(msg + self.get_state_for_user)
+		print(msg + self.get_state_for_user())
 
 	def get_state_for_user(self):
 		msg = '\nLogs and output in: ' + self.logdir
@@ -207,6 +207,17 @@ class PexpectSessionManager(object):
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'm',):
 				self.cycle_panes()
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
+			elif input_char in (u'z',):
+				# Revert layout status from zoomed
+				self.zoomed_session = None
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
+			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
+				# Set session as zoomed.
+				for session in self.pexpect_sessions:
+					if session.session_number == int(input_char):
+						self.zoomed_session = session
+				# Redraw screen
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'p',):
 				# Handle paused state
