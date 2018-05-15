@@ -569,7 +569,6 @@ class PexpectSession(object):
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
 					# We are within the realm of the pane now
 					pane_line_counter = 0
-				
 				break_at_end_of_this_line = False
 				# If line is so long that it's going to take over the end of the pane, then bail.
 				# If the pane_line_counter + the number of lines that this line will take up
