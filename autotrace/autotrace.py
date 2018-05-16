@@ -237,6 +237,7 @@ class PexpectSessionManager(object):
 			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
 				# Set session as zoomed.
 				for session in self.pexpect_sessions:
+					# TODO: map to top_right pane etc..
 					if session.session_number == int(input_char):
 						self.zoomed_session = session
 				assert self.zoomed_session
@@ -367,43 +368,43 @@ class PexpectSessionManager(object):
 		zoomed_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 	def do_layout_default(self):
-		main_session      = None
-		session_1         = None
-		session_2         = None
-		session_3         = None
+		main_session_pane      = None
+		bottom_left_pane       = None
+		bottom_right_pane      = None
+		top_right_pane         = None
 		for session in self.pexpect_sessions:
 			if session.session_number == 0:
-				main_session = session
-			elif session.session_number == 1:
-				session_1    = session
-			elif session.session_number == 2:
-				session_2    = session
-			elif session.session_number == 3:
-				session_3    = session
-		assert main_session is not None and session_1 is not None
+				main_session_pane = session.session_pane
+			elif session.session_pane and session.session_pane.name == 'bottom_left':
+				bottom_left_pane    = session.session_pane
+			elif session.session_pane and session.session_pane.name == 'bottom_right':
+				bottom_right_pane    = session.session_pane
+			elif session.session_pane and session.session_pane.name == 'top_right':
+				top_right_pane    = session.session_pane
+		assert main_session_pane is not None and bottom_left_pane is not None
 
-		if session_3 is None:
+		if top_right_pane is None:
 			# Two panes only, so are we vertically split?
 			if self.vertically_split:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+				main_session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			else:
-				main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start)
+				main_session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start)
 		else:
 			# At least 3 sessions (4 including main), so set up main session in top left...
-			main_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start)
+			main_session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight_bottom_start)
 			# ... and then session 3 setup in top right.
-			session_3.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start)
-		if session_2 is None:
+			top_right_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight_bottom_start)
+		if bottom_right_pane is None:
 			# Two panes only, so are we vertically split?
 			if self.vertically_split:
-				session_1.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+				bottom_left_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=0, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 			else:
-				session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+				bottom_left_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 		else:
 			# At least 2 sessions (3 including main), so set up second session in bottom left...
-			session_1.session_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
+			bottom_left_pane.set_position(top_left_x=0, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth_left_end, bottom_right_y=self.wheight-1)
 			# ... and then session 3 in bottom right.
-			session_2.session_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
+			bottom_right_pane.set_position(top_left_x=self.wwidth_right_start, top_left_y=self.wheight_bottom_start, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 
 	def pause_sessions(self):
