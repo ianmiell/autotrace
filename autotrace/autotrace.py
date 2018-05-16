@@ -47,6 +47,10 @@ class PexpectSessionManager(object):
 		self.timeout_delay        = 0.001
 		self.encoding             = encoding
 		self.zoomed_session       = None
+		self.trigger_debug        = False
+		# Example code for debug/breakpoint
+		#if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
+		#	import code; code.interact(local=dict(globals(), **locals())) 
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -227,6 +231,7 @@ class PexpectSessionManager(object):
 
 
 	def handle_input(self):
+		self.trigger_debug = False
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
@@ -236,6 +241,8 @@ class PexpectSessionManager(object):
 				self.quit_autotrace(msg=input_char + ' hit, quitting.')
 			elif input_char in (u'r',):
 				self.draw_screen('clearscreen',quick_help=self.get_quick_help())
+			elif input_char in (u'd',):
+				self.trigger_debug = True
 			elif input_char in (u'm',):
 				self.cycle_panes()
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
@@ -577,6 +584,9 @@ class PexpectSession(object):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
 		# TODO: if the pane was not 'filled', then mark the session as not scrollable back further.
+		#if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
+		#	print('write_out_session_to_fit_pane ' + str(self.output_lines_end_pane_pointer))
+		#	import code; code.interact(local=dict(globals(), **locals())) 
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
@@ -636,7 +646,6 @@ class PexpectSession(object):
 					pane_line_counter += 1
 				if pane_line_counter is not None and pane_line_counter > available_pane_height - 1:
 					break
-			output_lines_end_pane_pointer_has_been_set = False
 			# Add a status line in the pane
 			line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
 			line_str = line_str[:self.session_pane.get_width()]
@@ -648,6 +657,7 @@ class PexpectSession(object):
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor])
 			top_y    = self.session_pane.top_left_y
 			bottom_y = self.session_pane.bottom_right_y
+			output_lines_end_pane_pointer_has_been_set = False
 			for i, line_obj in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
 				# Status on bottom line
 				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
@@ -704,7 +714,7 @@ class PexpectSession(object):
 			self.output_lines_end_pane_pointer = len(self.output_lines)-1
 		else:
 			self.output_lines_end_pane_pointer += 1
-		# Move pane visibility along one too if the state is .
+		# Move pane visibility along one too if the state is not None.
 		if self.output_top_visible_line_index is not None:
 			self.output_top_visible_line_index += 1
 
