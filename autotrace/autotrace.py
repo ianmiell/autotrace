@@ -516,8 +516,8 @@ class PexpectSession(object):
 		output_lines                  - The lines of output. Each line is a
 		                                PexpectSessionLine object.
 		output_lines_end_pane_pointer - Used for scrolling, this tracks which
-		                                line is at the end of the pane as
-		                                displayed.
+		                                output_line index is at the end of the
+		                                pane as displayed.
 		output_top_visible_line_index - Used for scrolling, this tracks which
 		                                line is at the top of the pange as
 		                                displayed.
@@ -578,6 +578,7 @@ class PexpectSession(object):
 	def write_out_session_to_fit_pane(self):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
+		# TODO: if the pane was not 'filled', then mark the session as not scrollable back further.
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
