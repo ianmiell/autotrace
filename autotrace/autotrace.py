@@ -100,6 +100,12 @@ class PexpectSessionManager(object):
 		assert self.wheight >= 24, self.quit_autotrace('Terminal not tall enough!')
 		assert self.wwidth >= 80, self.quit_autotrace('Terminal not wide enough!')
 
+
+	def clear_screen(self):
+		for y in range(0,self.wheight):
+			line = ' '*self.wwidth
+			self.screen_arr[y:y+1,0:len(line)] = [line]
+
 	def write_to_manager_logfile(self, msg):
 		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
@@ -150,9 +156,7 @@ class PexpectSessionManager(object):
 		elif draw_type == 'help':
 			self.draw_help()
 		elif draw_type == 'clearscreen':
-			for y in range(0,self.wheight):
-				line = ' '*self.wwidth
-				self.screen_arr[y:y+1,0:len(line)] = [line]
+			self.clear_screen()
 		if not self.debug:
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
@@ -238,6 +242,7 @@ class PexpectSessionManager(object):
 			elif input_char in (u'z',):
 				# Revert layout status from zoomed
 				self.zoomed_session = None
+				self.do_layout('default')
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
 				# Set session as zoomed.
@@ -247,7 +252,7 @@ class PexpectSessionManager(object):
 						self.zoomed_session = session
 				assert self.zoomed_session
 				# Redraw screen
-				self.draw_screen('sessions',quick_help=self.get_quick_help() + 'ZOOM')
+				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'p',):
 				# Handle paused state
 				self.status = 'Paused'
@@ -370,6 +375,7 @@ class PexpectSessionManager(object):
 				zoomed_session = session
 				break
 		assert zoomed_session
+		assert zoomed_session.session_pane
 		zoomed_session.session_pane.set_position(top_left_x=0, top_left_y=1, bottom_right_x=self.wwidth, bottom_right_y=self.wheight-1)
 
 	def do_layout_default(self):
