@@ -25,6 +25,7 @@ if PY3:
 #         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
+# BUG: zoom in on un-displayed window - numbers should reflect which pane is active
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -679,6 +680,7 @@ class SessionPane(object):
 		self.bottom_right_x          = -1
 		self.bottom_right_y          = -1
 		self.color                   = color
+		assert self.name in ('top_left','bottom_left','top_right','bottom_right')
 
 	def __str__(self):
 		string =  '\n============= SESSION PANE OBJECT BEGIN ==================='
