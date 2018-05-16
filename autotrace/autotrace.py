@@ -338,7 +338,8 @@ class PexpectSessionManager(object):
 		session_count += 1
 		if session_1_command is None:
 			if platform.system() == 'Darwin':
-				session_1_command = 'dtruss -f -p ' + str(main_session.pid)
+				#session_1_command = 'dtruss -f -p ' + str(main_session.pid)
+				session_1_command = 'iostat 1'
 			else:
 				session_1_command = 'strace -tt -f -p ' + str(main_session.pid)
 		else:
@@ -780,11 +781,12 @@ def process_args():
 		args.v = False
 		time.sleep(1)
 	if args.commands == [] and not args.replayfile:
-		pid = get_last_run_pid()
+		pid, command = get_last_run_pid()
 		if pid:
 			print(str(pid) + ', TODO')
+			args.commands.append("""bash -c 'while true; do echo blah;sleep 100; done' """)
 		else:
-			print('No pid found, TODO')
+			print('No background process found on this terminal session.')
 			sys.exit(1)
 	return args
 
@@ -795,18 +797,19 @@ def get_last_run_pid(encoding='utf-8'):
 	# The grep gets all processes with the same tty
 	pses = pexpect.run("""bash -c '(export LC_ALL=C; ps -o etime=,tt=,pid= | sort -r)'""").decode(encoding).strip()
 	pses = pses.split('\r\n')
-	pses2 = []
+	pses_on_this_tty = []
 	for line in pses:
 		line_list = re.split('\s+', line.strip())
 		if line_list[1] == mytty:
-			pses2.append(line_list)
-	print(pses2)
-	# Drop the last two, as they're the ps and the sort.
-	pses = pses[:-2]
-	# Drop the first one, as that's the shell
-	pses = pses[1:]
-	# Drop the first one - that's the shell
-	pass
+			pses_on_this_tty.append(line_list)
+	# Drop the first and last one, as they're the shell and this python process respectively.
+	pses_on_this_tty = pses_on_this_tty[1:-1]
+	# Take the last one in this list, as that's the last-started background process
+	if len(pses_on_this_tty):
+		pid = pses_on_this_tty[-1][2]
+		return int(pid), 'cat # TODO: get command'
+	else:
+		return None, None
 
 	#jobs_command = 'jobs -p -s'
 	#ps_output  = pexpect.run(jobs_command).decode(encoding)
