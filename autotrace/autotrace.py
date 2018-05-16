@@ -25,7 +25,7 @@ if PY3:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
 # TODO BUG: zoom in on un-displayed window - numbers should reflect which pane is active, not 0123
-# TODO BUG: scrolling forward skips all pages.
+# TODO BUG: session 1 just stops on eg linux_monster.sh
 
 class PexpectSessionManager(object):
 	# Singleton
