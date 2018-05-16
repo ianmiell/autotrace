@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import pexpect
+import re
 import curtsies
 from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, green, on_black, on_dark, on_red, on_green, on_yellow, on_blue, on_magenta, on_cyan, on_gray, bold, dark, underline, blink, invert, plain
 from curtsies.input import Input
@@ -14,7 +15,6 @@ PY3 = sys.version_info[0] >= 3
 if PY3:
 	unicode = str
 
-# TODO: status bar per pane, toggle for showing commands in panes, highlight
 # TODO: remove cursor (how?)
 # TODO: default to 'strace the last thing you ran'? see get_last_run_pid
 # TODO: replay function?
@@ -735,37 +735,56 @@ def process_args():
 	return args
 
 def get_last_run_pid(encoding='utf-8'):
-	# GET CURRENT TTY: tty | sed 's/^.dev.\(.*\)/\1/'
-	# Get all processes with a tty
-	# Check stopped jobs first CTRL-Z
-	jobs_command = 'jobs -p -s'
-	ps_output  = pexpect.run(jobs_command).decode(encoding)
-	print(ps_output)
-	pids       = []
-	for l in ps_output.split('\r\n'):
-		pid = l.split(' ')[0].strip()
-		if pid == '':
-			continue
-		print(pid)
-		assert int(pid), 'pid is not an integer: ' + str(pid)
-	pids.append(pid)
-	if pids == []:
-		# Then look for running jobs
-		jobs_command = 'jobs -p -r'
-		ps_output  = pexpect.run(jobs_command).decode(encoding)
-		print(ps_output)
-		pids       = []
-		for l in ps_output.split('\r\n'):
-			pid = l.split(' ')[0].strip()
-			if pid == '':
-				continue
-			assert int(pid), 'pid is not an integer: ' + str(pid)
-			pids.append(pid)
-	if pids != []:
-		# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
-		# TODO: ask user whether they want to kill the process or
-		return pids[-1]
-	return None
+	# GET CURRENT TTY
+	mytty = pexpect.run('ps -o tt= -p ' + str(os.getpid())).decode(encoding).strip()
+	# ps -o etime | sort -r gets them in order.
+	# The grep gets all processes with the same tty
+	pses = pexpect.run("""bash -c '(export LC_ALL=C; ps -o etime=,tt=,pid= | sort -r)'""").decode(encoding).strip()
+	pses = pses.split('\r\n')
+	pses2 = []
+	for line in pses:
+		line_list = re.split('\s+', line.strip())
+		if line_list[1] == mytty:
+			pses2.append(line_list)
+	print(pses2)
+	# Drop the last two, as they're the ps and the sort.
+	pses = pses[:-2]
+	# Drop the first one, as that's the shell
+	pses = pses[1:]
+	# Drop the first one - that's the shell
+	pass
+
+	#jobs_command = 'jobs -p -s'
+	#ps_output  = pexpect.run(jobs_command).decode(encoding)
+	#pids       = []
+	#for l in ps_output.split('\r\n'):
+	#	pid = l.split(' ')[0].strip()
+	#	if pid == '':
+	#		continue
+	#	assert int(pid), 'pid is not an integer: ' + str(pid)
+	#	pids.append(pid)
+	#if pids != []:
+	#	# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
+	#	#       ask user whether they want to kill the process or
+	#	print('You have a suspended job, do you want to restart it and trace it from here? (You will not see the output?')
+	#	raw_input('?')
+	#	return pids[-1]
+	#if pids == []:
+	#	# Then look for running jobs
+	#	jobs_command = 'jobs -p -r'
+	#	ps_output  = pexpect.run(jobs_command).decode(encoding)
+	#	pids       = []
+	#	for l in ps_output.split('\r\n'):
+	#		pid = l.split(' ')[0].strip()
+	#		if pid == '':
+	#			continue
+	#		assert int(pid), 'pid is not an integer: ' + str(pid)
+	#		pids.append(pid)
+	#if pids != []:
+	#	# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
+	#	# TODO: ask user whether they want to kill the process or
+	#	return pids[-1]
+	#return None
 	# THEN LOOK FOR 'OTHER' JOBS BY THIS USER?
 	#ps_command = 'ps -o pid=,comm='
 	#ps_output  = pexpect.run(ps_command).decode(encoding)
