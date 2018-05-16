@@ -83,7 +83,7 @@ class PexpectSessionManager(object):
 		if self.debug:
 			print(msg)
 		else:
-			self.write_to_manager_logfile('DEBUG MESSAGE:\n' + msg)
+			self.write_to_manager_logfile('DEBUG MESSAGE: ' + msg)
 		if pause:
 			time.sleep(pause)
 
@@ -471,11 +471,13 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
+				if session.session_number == 0:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
 					session.output_top_visible_line_index = None
 				else:
 					return_msg = ' at least one session has hit the top'
+				if session.session_number == 0:
 		return return_msg
 
 	def scroll_forward(self):
@@ -483,11 +485,13 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
+				if session.session_number == 0:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer < len(session.output_lines):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 					session.output_lines_end_pane_pointer = None
 				else:
 					return_msg = ' at least one session has hit the end'
+				if session.session_number == 0:
 		return return_msg
 
 	def move_panes_to_tail(self):
@@ -615,7 +619,7 @@ class PexpectSession(object):
 				break_at_end_of_this_line = False
 				# If line is so long that it's going to take over the end of the pane, then bail.
 				# If the pane_line_counter + the number of lines that this line will take up
-				if pane_line_counter and pane_line_counter+((len(line)/width-1)+1) > available_pane_height - 1:
+				if pane_line_counter is not None and pane_line_counter+((len(line)/width-1)+1) > available_pane_height - 1:
 					break
 				else:
 					while len(line) > width-1:
@@ -623,7 +627,7 @@ class PexpectSession(object):
 						# counter and up one for each pane line computed.
 						lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
 						line = line[width-1:]
-						if pane_line_counter:
+						if pane_line_counter is not None:
 							pane_line_counter += 1
 							if pane_line_counter > available_pane_height - 1:
 								# Make sure we finish this line, so iterate until done!
@@ -632,9 +636,9 @@ class PexpectSession(object):
 					break
 				# Add the remainder of this line.
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
-				if pane_line_counter:
+				if pane_line_counter is not None:
 					pane_line_counter += 1
-				if pane_line_counter and pane_line_counter > available_pane_height - 1:
+				if pane_line_counter is not None and pane_line_counter > available_pane_height - 1:
 					break
 			output_lines_end_pane_pointer_has_been_set = False
 			# Add a status line in the pane
