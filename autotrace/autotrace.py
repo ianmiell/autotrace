@@ -471,13 +471,11 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				if session.session_number == 0:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
 					session.output_top_visible_line_index = None
 				else:
 					return_msg = ' at least one session has hit the top'
-				if session.session_number == 0:
 		return return_msg
 
 	def scroll_forward(self):
@@ -485,13 +483,11 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				if session.session_number == 0:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer < len(session.output_lines):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 					session.output_lines_end_pane_pointer = None
 				else:
 					return_msg = ' at least one session has hit the end'
-				if session.session_number == 0:
 		return return_msg
 
 	def move_panes_to_tail(self):
@@ -789,6 +785,8 @@ def process_args():
 		else:
 			print('No background process found on this terminal session.')
 			sys.exit(1)
+	# BUG! if logtimestep is false it's broked
+	args.logtimestep = True
 	return args
 
 def get_last_run_pid(encoding='utf-8'):
