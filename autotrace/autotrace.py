@@ -259,9 +259,11 @@ class PexpectSessionManager(object):
 				self.pause_sessions()
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 				for e in input_generator:
-					if input_char in quit_chars:
+					if e:
+						self.write_to_manager_logfile('input_char: ' + e)
+					if e in quit_chars:
 						self.quit_autotrace()
-					elif input_char in (u'r',):
+					elif e in (u'r',):
 						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
 						self.status_message = 'you just refreshed ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
@@ -288,10 +290,12 @@ class PexpectSessionManager(object):
 				self.pause_sessions()
 				self.draw_screen('help',quick_help=self.get_quick_help())
 				for e in input_generator:
+					if e:
+						self.write_to_manager_logfile('input_char: ' + e)
 					if e in quit_chars:
 						# TODO: maybe go back to running from here?
 						self.quit_autotrace()
-					elif input_char in (u'r',):
+					elif e in (u'r',):
 						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
 						self.status_message = 'you just refreshed ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
@@ -635,10 +639,15 @@ class PexpectSession(object):
 					break
 			output_lines_end_pane_pointer_has_been_set = False
 			# Add a status line in the pane
+			line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
+			line_str = line_str[:self.session_pane.get_width()]
 			if lines_in_pane_str_arr:
-				line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
-				line_str = line_str[:self.session_pane.get_width()]
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor+1])
+			else:
+				if output_lines_cursor is None:
+					output_lines_cursor = 0
+				lines_in_pane_str_arr.append([line_str, output_lines_cursor])
+				pass
 			top_y    = self.session_pane.top_left_y
 			bottom_y = self.session_pane.bottom_right_y
 			for i, line in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
