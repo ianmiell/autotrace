@@ -16,7 +16,6 @@ if PY3:
 	unicode = str
 
 # TODO: remove cursor (how?)
-# TODO: default to 'strace the last thing you ran'? see get_last_run_pid
 # TODO: replay function?
 #       - put elapsed time in before each line
 #       - replayer will 'just' read through the output files in the logs
@@ -25,7 +24,8 @@ if PY3:
 #         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
-# BUG: zoom in on un-displayed window - numbers should reflect which pane is active
+# TODO BUG: zoom in on un-displayed window - numbers should reflect which pane is active, not 0123
+# TODO BUG: scrolling forward skips all pages.
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -520,8 +520,8 @@ class PexpectSession(object):
 		                                output_line index is at the end of the
 		                                pane as displayed.
 		output_top_visible_line_index - Used for scrolling, this tracks which
-		                                line is at the top of the pange as
-		                                displayed.
+		                                output_line index is at the top of the
+										pane as displayed.
 		pid                           - The process ID that this session
 		                                spawned.
 		encoding                      - Text encoding for this session's output.
@@ -565,14 +565,11 @@ class PexpectSession(object):
 		string += '\ncommand: ' + str(self.command)
 		string += '\npid: ' + str(self.pid)
 		string += '\noutput_lines length: ' + str(len(self.output_lines))
-		if self.output_lines_end_pane_pointer is not None:
-			string += '\noutput_lines_end_pane_pointer: ' + str(self.output_lines_end_pane_pointer)
-		if self.output_top_visible_line_index is not None:
-			string += '\noutput_top_visible_line_index: ' + str(self.output_top_visible_line_index)
+		string += '\noutput_lines_end_pane_pointer: ' + str(self.output_lines_end_pane_pointer)
+		string += '\noutput_top_visible_line_index: ' + str(self.output_top_visible_line_index)
 		for line in self.output_lines:
 			string += '\nline: ' + str(line.line_str)
-		if self.session_pane is not None:
-			string += '\nsession_pane: ' + str(self.session_pane)
+		string += '\nsession_pane: ' + str(self.session_pane)
 		string += '\n============= SESSION OBJECT END   ==================='
 		return string
 
@@ -652,19 +649,19 @@ class PexpectSession(object):
 				pass
 			top_y    = self.session_pane.top_left_y
 			bottom_y = self.session_pane.bottom_right_y
-			for i, line in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
+			for i, line_obj in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
 				# Status on bottom line
 				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
 				# OR If this is on the bottom (ie top_y is not 1), and height + top_y == i
 				if (top_y == 1 and available_pane_height + top_y == i) or (top_y != 1 and available_pane_height + top_y == i):
-					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [cyan(invert(line[0]))]
+					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
 				else:
-					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line[0])] = [self.session_pane.color(line[0])]
+					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [self.session_pane.color(line_obj[0])]
 				if not output_lines_end_pane_pointer_has_been_set:
-					self.output_lines_end_pane_pointer = line[1]
+					self.output_lines_end_pane_pointer = line_obj[1]
 					output_lines_end_pane_pointer_has_been_set = True
 				# Record the uppermost-visible line
-				self.output_top_visible_line_index = line[1]
+				self.output_top_visible_line_index = line_obj[1]
 
 	def spawn(self):
 		self.pexpect_session = pexpect.spawn(self.command)
@@ -783,8 +780,8 @@ def process_args():
 	if args.commands == [] and not args.replayfile:
 		pid, command = get_last_run_pid()
 		if pid:
-			print(str(pid) + ', TODO')
-			args.commands.append("""bash -c 'while true; do echo blah;sleep 100; done' """)
+			#args.commands.append("""bash -c 'while true; do echo "dummy process as we cannot attach to background process: """ + str(pid) + """ with command: """ + command + """ ";sleep 2; done' """)
+			args.commands.append("""echo bg command being tracked is: """ + command)
 		else:
 			print('No background process found on this terminal session.')
 			sys.exit(1)
@@ -795,7 +792,7 @@ def get_last_run_pid(encoding='utf-8'):
 	mytty = pexpect.run('ps -o tt= -p ' + str(os.getpid())).decode(encoding).strip()
 	# ps -o etime | sort -r gets them in order.
 	# The grep gets all processes with the same tty
-	pses = pexpect.run("""bash -c '(export LC_ALL=C; ps -o etime=,tt=,pid= | sort -r)'""").decode(encoding).strip()
+	pses = pexpect.run("""bash -c '(export LC_ALL=C; ps -o etime=,tt=,pid=,args= | sort -r)'""").decode(encoding).strip()
 	pses = pses.split('\r\n')
 	pses_on_this_tty = []
 	for line in pses:
@@ -807,7 +804,8 @@ def get_last_run_pid(encoding='utf-8'):
 	# Take the last one in this list, as that's the last-started background process
 	if len(pses_on_this_tty):
 		pid = pses_on_this_tty[-1][2]
-		return int(pid), 'cat # TODO: get command'
+		command = pses_on_this_tty[-1][3:]
+		return int(pid), ' '.join(command)
 	else:
 		return None, None
 
