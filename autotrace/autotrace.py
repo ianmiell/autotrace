@@ -31,6 +31,11 @@ class PexpectSessionManager(object):
 	# Singleton
 	only_one = None
 	def __init__(self, logdir=None, debug=False, encoding='utf-8'):
+		"""
+
+		only_one             - 
+		debug                - 
+		"""
 		assert self.only_one is None
 		self.only_one             = True
 		self.debug                = debug
@@ -237,7 +242,7 @@ class PexpectSessionManager(object):
 			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
 				# Set session as zoomed.
 				for session in self.pexpect_sessions:
-					# TODO: map to top_right pane etc..
+					# TODO: show and expect numbers of displayed panes only.
 					if session.session_number == int(input_char):
 						self.zoomed_session = session
 				assert self.zoomed_session
@@ -488,6 +493,36 @@ class PexpectSessionManager(object):
 class PexpectSession(object):
 
 	def __init__(self, command, pexpect_session_manager, session_number, pane_name=None, pane_color=red, encoding='utf-8', logtimestep=False):
+		"""
+
+		pexpect_session               - The pexpect object that is held within
+		                                this session.
+		session_number                - Index of session - 0 is reserved for the
+		                                'main' command. This does not change,
+		                                unlike the session_pane value which
+		                                changes depending on which SessionPane
+		                                the session is assigned to in the window.
+		command                       - The command tracked in this session
+		output_lines                  - The lines of output. Each line is a
+		                                PexpectSessionLine object.
+		output_lines_end_pane_pointer - Used for scrolling, this tracks which
+		                                line is at the end of the pane as
+		                                displayed.
+		output_top_visible_line_index - Used for scrolling, this tracks which
+		                                line is at the top of the pange as
+		                                displayed.
+		pid                           - The process ID that this session
+		                                spawned.
+		encoding                      - Text encoding for this session's output.
+		pexpect_session_manager       - Reference to global window/controlling
+		                                object.
+		logfilename                   - Name of logfile for this session.
+		logfile                       - Python file object for logfile.
+		logtimestep                   - Whether to log each second in the output.
+		session_pane                  - SessionPane object that this session is
+		                                assigned to. If None, session is not
+		                                being displayed.
+		"""
 		self.pexpect_session               = None
 		self.session_number                = session_number
 		self.command                       = command
@@ -501,11 +536,11 @@ class PexpectSession(object):
 		self.logfilename                   = pexpect_session_manager.logdir + '/' + str(self.session_number) + '.autotrace.' + str(pexpect_session_manager.pid) + '.log'
 		self.logfile                       = open(self.logfilename,'w+')
 		self.logtimestep                   = logtimestep
+		self.session_pane                  = None
 		# Append to sessions
 		self.pexpect_session_manager.pexpect_sessions.append(self)
 		if self.session_number == 0:
 			pexpect_session_manager.main_command_session = self
-		self.session_pane                  = None
 		if pane_name:
 			self.session_pane              = SessionPane(pane_name, pane_color)
 			self.session_pane.top_left     = (-1,-1)
@@ -595,7 +630,7 @@ class PexpectSession(object):
 			output_lines_end_pane_pointer_has_been_set = False
 			# Add a status line in the pane
 			if lines_in_pane_str_arr:
-				line_str = 'Pane no: ' + str(self.session_number) + ', command: ' + self.command
+				line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
 				line_str = line_str[:self.session_pane.get_width()]
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor+1])
 			top_y    = self.session_pane.top_left_y
