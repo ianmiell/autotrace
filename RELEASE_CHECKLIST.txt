@@ -4,8 +4,6 @@ pylint -rn autotrace/autotrace.py
 - Run
 ./examples/linux_*
 
-- docker build -t imiell/autotrace . && docker push imiell/autotrace
-
 - Move panes test (5)
 
 - Pause/unpause (any)
@@ -18,3 +16,5 @@ on a mac
 
 - Look for debug_msg and remove debug
 
+./release.sh
+- docker build -t imiell/autotrace . && docker push imiell/autotrace

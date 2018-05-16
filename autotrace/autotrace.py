@@ -33,8 +33,8 @@ class PexpectSessionManager(object):
 	def __init__(self, logdir=None, debug=False, encoding='utf-8'):
 		"""
 
-		only_one             - 
-		debug                - 
+		only_one             -
+		debug                -
 		"""
 		assert self.only_one is None
 		self.only_one             = True
@@ -265,7 +265,7 @@ class PexpectSessionManager(object):
 						self.quit_autotrace()
 					elif e in (u'r',):
 						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
-						self.status_message = 'you just refreshed ' + msg
+						self.status_message = 'you just refreshed '
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'c':
 						self.move_panes_to_tail()
@@ -646,7 +646,6 @@ class PexpectSession(object):
 				if output_lines_cursor is None:
 					output_lines_cursor = 0
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor])
-				pass
 			top_y    = self.session_pane.top_left_y
 			bottom_y = self.session_pane.bottom_right_y
 			for i, line_obj in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
@@ -798,7 +797,7 @@ def get_last_run_pid(encoding='utf-8'):
 	pses = pses.split('\r\n')
 	pses_on_this_tty = []
 	for line in pses:
-		line_list = re.split('\s+', line.strip())
+		line_list = re.split(r'\s+', line.strip())
 		if line_list[1] == mytty:
 			pses_on_this_tty.append(line_list)
 	# Drop the first and last one, as they're the shell and this python process respectively.
@@ -808,8 +807,7 @@ def get_last_run_pid(encoding='utf-8'):
 		pid = pses_on_this_tty[-1][2]
 		command = pses_on_this_tty[-1][3:]
 		return int(pid), ' '.join(command)
-	else:
-		return None, None
+	return None, None
 
 	#jobs_command = 'jobs -p -s'
 	#ps_output  = pexpect.run(jobs_command).decode(encoding)
@@ -905,12 +903,12 @@ def main():
 # Basic flow of application
 ################################################################################
 # draw_screen
-# 	do_layout
+# 	do_layout
 # 		do_layout_default (or _zoomed)
 # 	for each session that is displayed:
 # 		write_out_session_to_fit_pane
 # handle_sessions
-# 	reads lines from pexpect sessions
+#	reads lines from pexpect sessions
 # handle_input
 # 	(can also) draw_screen
 ################################################################################

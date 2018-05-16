@@ -26,3 +26,4 @@ done
 git commit -am "release: $major.$minor.$newpoint"
 echo Success after $i attempts
 git push
+docker build -t imiell/autotrace . && docker push imiell/autotrace
