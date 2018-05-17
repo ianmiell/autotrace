@@ -879,6 +879,8 @@ def clear_screen():
 	# Completely clear screen (useful for debugging)
 	# https://stackoverflow.com/questions/2084508/clear-terminal-in-python
 	sys.stderr.write("\x1b[2J\x1b[H")
+	# https://stackoverflow.com/questions/4842424/list-of-ansi-color-escape-sequences
+	sys.stderr.write("\x1b[0")
 
 
 def main():
