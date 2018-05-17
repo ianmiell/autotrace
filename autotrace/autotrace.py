@@ -273,6 +273,8 @@ class PexpectSessionManager(object):
 						self.write_to_manager_logfile('input_char: ' + e)
 					if e in quit_chars:
 						self.quit_autotrace()
+					elif e in (u'd',):
+						self.trigger_debug = True
 					elif e in (u'r',):
 						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
 						self.status_message = 'you just refreshed '
@@ -318,6 +320,8 @@ class PexpectSessionManager(object):
 					if e in quit_chars:
 						# TODO: maybe go back to running from here?
 						self.quit_autotrace()
+					elif e in (u'd',):
+						self.trigger_debug = True
 					elif e in (u'r',):
 						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
 						self.status_message = 'you just refreshed ' + msg
