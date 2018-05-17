@@ -11,6 +11,11 @@ import curtsies
 from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, green, on_black, on_dark, on_red, on_green, on_yellow, on_blue, on_magenta, on_cyan, on_gray, bold, dark, underline, blink, invert, plain
 from curtsies.input import Input
 
+# Example code for debug/breakpoint
+#if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
+#	import code; code.interact(local=dict(globals(), **locals())) 
+#	import pdb; pdb.trace()
+
 PY3 = sys.version_info[0] >= 3
 if PY3:
 	unicode = str
@@ -25,7 +30,6 @@ if PY3:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
 # TODO BUG: zoom in on un-displayed window - numbers should reflect which pane is active, not 0123
-# TODO BUG: session 1 just stops on eg linux_monster.sh
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -48,9 +52,6 @@ class PexpectSessionManager(object):
 		self.encoding             = encoding
 		self.zoomed_session       = None
 		self.trigger_debug        = False
-		# Example code for debug/breakpoint
-		#if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
-		#	import code; code.interact(local=dict(globals(), **locals())) 
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -280,6 +281,15 @@ class PexpectSessionManager(object):
 						self.status = 'Running'
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						break
+					# TODO: make these work and add them to help
+					elif e == 'j':
+						msg = self.scroll_down_one()
+						self.status_message = 'you just scrolled down one ' + msg
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
+					elif e == 'k':
+						msg = self.scroll_up_one()
+						self.status_message = 'you just scrolled up one ' + msg
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'b':
 						msg = self.scroll_back()
 						self.status_message = 'you just hit back ' + msg
@@ -473,6 +483,28 @@ class PexpectSessionManager(object):
 			y += 1
 		self.pexpect_sessions[0].write_to_manager_logfile('==========DEBUG SCREEN ARRAY END============')
 
+	def scroll_down_one(self):
+		return_msg = ''
+		for session in self.pexpect_sessions:
+			if session.session_pane:
+				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
+					session.output_top_visible_line_index += 1
+					session.output_lines_end_pane_pointer = None
+				else:
+					return_msg = ' at least one session has hit the top'
+		return return_msg
+
+	def scroll_up_one(self):
+		return_msg = ''
+		for session in self.pexpect_sessions:
+			if session.session_pane:
+				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
+					session.output_lines_end_pane_pointer -= 1
+					session.output_top_visible_line_index = None
+				else:
+					return_msg = ' at least one session has hit the top'
+		return return_msg
+
 	def scroll_back(self):
 		# for each session: take the pointer, and move the _end_ pointer back to the output_top_visible_line_index - 1 and re-display
 		return_msg = ''
@@ -583,7 +615,6 @@ class PexpectSession(object):
 	def write_out_session_to_fit_pane(self):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
-		# TODO: if the pane was not 'filled', then mark the session as not scrollable back further.
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
