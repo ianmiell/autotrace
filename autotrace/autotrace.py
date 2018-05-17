@@ -54,6 +54,7 @@ class PexpectSessionManager(object):
 		self.encoding             = encoding
 		self.zoomed_session       = None
 		self.trigger_debug        = False
+		self.pointers_fixed       = False
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -509,7 +510,6 @@ class PexpectSessionManager(object):
 
 	def scroll_up_one(self):
 		return_msg = ''
-		self.end_pointer_is_fixed = True
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
@@ -594,7 +594,6 @@ class PexpectSession(object):
 		self.command                       = command
 		self.output_lines                  = []
 		self.output_lines_end_pane_pointer = None
-		self.pointers_fixed                = False
 		# Pointer to the uppermost-visible PexpectSessionLine in this pane
 		self.output_top_visible_line_index = None
 		self.pid                           = None
@@ -646,6 +645,7 @@ class PexpectSession(object):
 			end_known_but_not_start = None
 			start_known_but_not_end = None
 			start_and_end_known     = None
+			num_lines_to_show       = None
 			if len(self.output_lines) != 0:
 				if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
 					self.pexpect_session_manager.write_to_manager_logfile('We know where we end but not where we start: end at: ' + str(self.output_lines_end_pane_pointer))
@@ -655,6 +655,8 @@ class PexpectSession(object):
 					start_known_but_not_end = True
 				elif self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is not None:
 					start_and_end_known = True
+					if self.pexpect_session_manager.pointers_fixed:
+						num_lines_to_show = self.output_lines_end_pane_pointer - self.output_top_visible_line_index
 				assert start_known_but_not_end or end_known_but_not_start or start_and_end_known, str(self)
 			else:
 				# Neither is set. This is OK at the start, ie len of output_lines is zero.
@@ -726,10 +728,10 @@ class PexpectSession(object):
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
 				else:
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [self.session_pane.color(line_obj[0])]
-				if not output_lines_end_pane_pointer_has_been_set and self.pointers_fixed == False:
+				if not output_lines_end_pane_pointer_has_been_set and self.pexpect_session_manager.pointers_fixed == False:
 					self.output_lines_end_pane_pointer = line_obj[1]
 					output_lines_end_pane_pointer_has_been_set = True
-				if self.pointers_fixed == False:
+				if self.pexpect_session_manager.pointers_fixed == False:
 					# Record the uppermost-visible line
 					self.output_top_visible_line_index = line_obj[1]
 
