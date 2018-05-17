@@ -29,9 +29,6 @@ if PY3:
 #         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
-# TODO BUG: zoom in on un-displayed window - numbers should reflect which pane is active, not 0123
-# TODO: rethink output_lines_end_pane_pointer when drawing screen: sometimes we
-#       want it to hard-stop there, sometimes we want to record where the end was when rendered.
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -215,10 +212,11 @@ class PexpectSessionManager(object):
 			number_of_sessions = len(self.pexpect_sessions)
 			zoom_str = ''
 			for i in range(0,number_of_sessions):
-				if i > 0:
-					zoom_str += ',' + str(i)
-				else:
-					zoom_str += str(i)
+				if self.get_pane_by_session_number(i) is not None:
+					if i > 0:
+						zoom_str += ',' + str(i)
+					else:
+						zoom_str += str(i)
 			if number_of_sessions > 4:
 				if self.zoomed_session:
 					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, z: zoom out, h: help =>  '
@@ -227,9 +225,9 @@ class PexpectSessionManager(object):
 			else:
 				quick_help = 'q/ESC/C-d: quit, p: pause, r: refresh, h: help =>  '
 		elif self.status == 'Paused':
-			quick_help = 'q/ESC/C-d: quit, c: continue running, f: page forward, b: page back, r: refresh, h: help =>  '
+			quick_help = 'q/ESC/C-d: quit, c: continue, j/k: scroll down/up: f/b: page forward/back, r: refresh, h: help =>  '
 		elif self.status == 'Help':
-			quick_help = 'q/ESC/C-d: quit, c: continue running, r: refresh =>  '
+			quick_help = 'q/ESC/C-d: quit, c: continue, r: refresh =>  '
 		return quick_help
 
 
@@ -256,14 +254,21 @@ class PexpectSessionManager(object):
 				self.do_layout('default')
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
-				# Set session as zoomed.
-				for session in self.pexpect_sessions:
-					# TODO: show and expect numbers of displayed panes only.
-					if session.session_number == int(input_char):
-						self.zoomed_session = session
-				assert self.zoomed_session
-				# Redraw screen
-				self.draw_screen('sessions',quick_help=self.get_quick_help())
+				if self.zoomed_session is None:
+					number_of_sessions = len(self.pexpect_sessions)
+					# Only accept if pane is assigned to this session.
+					if self.get_pane_by_session_number(int(input_char)) is not None:
+						# Set session as zoomed.
+						for session in self.pexpect_sessions:
+							if session.session_number == int(input_char):
+								self.zoomed_session = session
+						assert self.zoomed_session
+						# Redraw screen
+						self.draw_screen('sessions',quick_help=self.get_quick_help())
+				else:
+					self.zoomed_session = None
+					self.do_layout('default')
+					self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in (u'p',):
 				# Handle paused state
 				self.status = 'Paused'
@@ -286,26 +291,21 @@ class PexpectSessionManager(object):
 						self.status = 'Running'
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						break
-					# TODO: make these work and add them to help
 					elif e == 'j':
 						msg = self.scroll_down_one()
 						self.status_message = 'you just scrolled down one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'k':
-						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
 						self.pointers_fixed = True
 						msg = self.scroll_up_one()
-						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
 						self.status_message = 'you just scrolled up one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						self.pointers_fixed = False
-						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
-						#sys.exit(1)
 					elif e == 'b':
 						msg = self.scroll_back()
 						self.status_message = 'you just hit back ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
-					elif e == 'f':
+					elif e in ('f','<SPACE>'):
 						msg = self.scroll_forward()
 						self.status_message = 'you just hit forward ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
@@ -550,6 +550,7 @@ class PexpectSessionManager(object):
 			session.output_lines_end_pane_pointer = len(session.output_lines)-1
 
 	def get_pane_by_session_number(self, session_number):
+		assert isinstance(session_number,int)
 		for session in self.pexpect_sessions:
 			if session.session_number == session_number:
 				return session.session_pane
