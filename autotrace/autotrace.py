@@ -289,9 +289,13 @@ class PexpectSessionManager(object):
 						self.status_message = 'you just scrolled down one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'k':
+						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
 						msg = self.scroll_up_one()
-						self.status_message = 'you just scrolled up one ' + msg
+						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
+						#self.status_message = 'you just scrolled up one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
+						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
+						#sys.exit(1)
 					elif e == 'b':
 						msg = self.scroll_back()
 						self.status_message = 'you just hit back ' + msg
@@ -642,6 +646,7 @@ class PexpectSession(object):
 					start_and_end_known = True
 				assert start_known_but_not_end or end_known_but_not_start or start_and_end_known, str(self)
 			else:
+				# Neither is set. This is OK at the start, ie len of output_lines is zero.
 				assert self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
@@ -649,6 +654,9 @@ class PexpectSession(object):
 					output_lines_cursor = 0
 				else:
 					output_lines_cursor += 1
+				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
+					# We are within the realm of the pane now. plc starts at 1.
+					pane_line_counter = 1
 				# If we go past the output line pointer, then break - we don't want to see any later lines.
 				if self.output_lines_end_pane_pointer is not None and output_lines_cursor > self.output_lines_end_pane_pointer:
 					break
@@ -658,9 +666,6 @@ class PexpectSession(object):
 					last_time_seen = int(line_obj.time_seen)
 				# Strip whitespace at end, including \r\n
 				line = line_obj.line_str.rstrip()
-				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
-					# We are within the realm of the pane now. plc start at 1.
-					pane_line_counter = 1
 				break_at_end_of_this_line = False
 				# If line is so long that it's going to take over the end of the pane, then bail.
 				# If the pane_line_counter + the number of lines that this line will take up
@@ -695,6 +700,7 @@ class PexpectSession(object):
 			if lines_in_pane_str_arr:
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor+1])
 			else:
+				# Nothing to display - just display the status line.
 				if output_lines_cursor is None:
 					output_lines_cursor = 0
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor])
@@ -819,10 +825,6 @@ def process_args():
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
-	#if args.commands == [] and args.replayfile is None:
-	#	print('You must supply either a command or a replayfile')
-	#	parser.print_help(sys.stdout)
-	#	sys.exit(1)
 	if isinstance(args.commands,str):
 		args.commands = [args.commands]
 	if args.v and len(args.commands) > 2:
@@ -837,8 +839,9 @@ def process_args():
 		else:
 			print('No background process found on this terminal session.')
 			sys.exit(1)
-	# BUG! if logtimestep is false it's broked
-	args.logtimestep = True
+	# Validate END
+	# BUG! if logtimestep is false it's broked - is it?
+	#args.logtimestep = True
 	return args
 
 def get_last_run_pid(encoding='utf-8'):
@@ -861,65 +864,6 @@ def get_last_run_pid(encoding='utf-8'):
 		command = pses_on_this_tty[-1][3:]
 		return int(pid), ' '.join(command)
 	return None, None
-
-	#jobs_command = 'jobs -p -s'
-	#ps_output  = pexpect.run(jobs_command).decode(encoding)
-	#pids       = []
-	#for l in ps_output.split('\r\n'):
-	#	pid = l.split(' ')[0].strip()
-	#	if pid == '':
-	#		continue
-	#	assert int(pid), 'pid is not an integer: ' + str(pid)
-	#	pids.append(pid)
-	#if pids != []:
-	#	# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
-	#	#       ask user whether they want to kill the process or
-	#	print('You have a suspended job, do you want to restart it and trace it from here? (You will not see the output?')
-	#	raw_input('?')
-	#	return pids[-1]
-	#if pids == []:
-	#	# Then look for running jobs
-	#	jobs_command = 'jobs -p -r'
-	#	ps_output  = pexpect.run(jobs_command).decode(encoding)
-	#	pids       = []
-	#	for l in ps_output.split('\r\n'):
-	#		pid = l.split(' ')[0].strip()
-	#		if pid == '':
-	#			continue
-	#		assert int(pid), 'pid is not an integer: ' + str(pid)
-	#		pids.append(pid)
-	#if pids != []:
-	#	# TODO: get the command (ps -ww -p PID), and re-run (as we can't attach it - emit warning at the end to kill off that process)
-	#	# TODO: ask user whether they want to kill the process or
-	#	return pids[-1]
-	#return None
-	# THEN LOOK FOR 'OTHER' JOBS BY THIS USER?
-	#ps_command = 'ps -o pid=,comm='
-	#ps_output  = pexpect.run(ps_command).decode(encoding)
-	#pids       = []
-	#for l in ps_output.split('\r\n'):
-	#       # TODO If line contains ps_command, ignore
-	#       if l.find(ps_command) != -1:
-	#               continue
-	#       print(l)
-	#       pid = l.split(' ')[0].strip()
-	#       if pid == '':
-	#               continue
-	#       assert int(pid), 'pid is not an integer: ' + str(pid)
-	#       pids.append(pid)
-	## TODO: not working on mac (wrong date binary)
-	## TODO: use jobs to find background commands. foreground it if necessary
-	## TODO: if no background command,
-	#date_command = 'date'
-	#times = {}
-	#for pid in pids:
-	#       command = """bash -c '(export TZ=UTC0; export LC_ALL=C; date -d "$(ps -o start= -p '""" + pid + """')" +%s)'"""
-	#       print(command)
-	#       process_time_s = pexpect.run(command).decode(encoding).strip()
-	#       if process_time_s[:5] == 'usage':
-	#               # TODO: handle mac
-	#               print('asd')
-	#       assert int(process_time_s)
 
 
 def replace_pid(string, pid_str):
