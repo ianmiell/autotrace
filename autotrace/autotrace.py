@@ -302,9 +302,11 @@ class PexpectSessionManager(object):
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						self.pointers_fixed = False
 					elif e == 'b':
+						self.pointers_fixed = True
 						msg = self.scroll_back()
 						self.status_message = 'you just hit back ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
+						self.pointers_fixed = False
 					elif e in ('f','<SPACE>'):
 						msg = self.scroll_forward()
 						self.status_message = 'you just hit forward ' + msg
@@ -526,7 +528,7 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
-					if session.output_top_visible_line_index > 0:
+					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
 						session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
 					session.output_top_visible_line_index = None
 				else:
