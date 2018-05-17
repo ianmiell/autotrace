@@ -491,7 +491,8 @@ class PexpectSessionManager(object):
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_top_visible_line_index += 1
-					session.output_lines_end_pane_pointer = None
+					if session.output_lines_end_pane_pointer is not None:
+						session.output_lines_end_pane_pointer -= 1
 				else:
 					return_msg = ' at least one session has hit the top'
 		return return_msg
@@ -502,7 +503,8 @@ class PexpectSessionManager(object):
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_lines_end_pane_pointer -= 1
-					session.output_top_visible_line_index = None
+					if session.output_top_visible_line_index is not None:
+						session.output_top_visible_line_index -= 1
 				else:
 					return_msg = ' at least one session has hit the top'
 		return return_msg
