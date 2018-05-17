@@ -5,8 +5,8 @@ import platform
 import os
 import sys
 import time
-import pexpect
 import re
+import pexpect
 import curtsies
 from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, green, on_black, on_dark, on_red, on_green, on_yellow, on_blue, on_magenta, on_cyan, on_gray, bold, dark, underline, blink, invert, plain
 from curtsies.input import Input
@@ -645,7 +645,6 @@ class PexpectSession(object):
 			end_known_but_not_start = None
 			start_known_but_not_end = None
 			start_and_end_known     = None
-			num_lines_to_show       = None
 			if len(self.output_lines) != 0:
 				if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
 					self.pexpect_session_manager.write_to_manager_logfile('We know where we end but not where we start: end at: ' + str(self.output_lines_end_pane_pointer))
@@ -655,8 +654,6 @@ class PexpectSession(object):
 					start_known_but_not_end = True
 				elif self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is not None:
 					start_and_end_known = True
-					if self.pexpect_session_manager.pointers_fixed:
-						num_lines_to_show = self.output_lines_end_pane_pointer - self.output_top_visible_line_index
 				assert start_known_but_not_end or end_known_but_not_start or start_and_end_known, str(self)
 			else:
 				# Neither is set. This is OK at the start, ie len of output_lines is zero.
@@ -682,7 +679,7 @@ class PexpectSession(object):
 				break_at_end_of_this_line = False
 				# If line is so long that it's going to take over the end of the pane, then bail.
 				# If the pane_line_counter + the number of lines that this line will take up
-				num_pane_lines_taken_up = (len(line)/width-1)+1
+				#num_pane_lines_taken_up = (len(line)/width-1)+1
 				# The following code, while neat, causes a bug where screens do not 'move on'.
 				# BROKEN CODE BEGINS
 				#if pane_line_counter is not None and pane_line_counter+num_pane_lines_taken_up > available_pane_height:
