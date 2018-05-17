@@ -108,7 +108,7 @@ class PexpectSessionManager(object):
 		assert self.wwidth >= 80, self.quit_autotrace('Terminal not wide enough!')
 
 
-	def clear_screen(self):
+	def clear_screen_arr(self):
 		for y in range(0,self.wheight):
 			line = ' '*self.wwidth
 			self.screen_arr[y:y+1,0:len(line)] = [line]
@@ -163,7 +163,7 @@ class PexpectSessionManager(object):
 		elif draw_type == 'help':
 			self.draw_help()
 		elif draw_type == 'clearscreen':
-			self.clear_screen()
+			self.clear_screen_arr()
 		if not self.debug:
 			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
 
@@ -873,6 +873,12 @@ def get_last_run_pid(encoding='utf-8'):
 def replace_pid(string, pid_str):
 	assert isinstance(pid_str, str)
 	return string.replace('PID', pid_str)
+
+
+def clear_screen():
+	# Completely clear screen (useful for debugging)
+	# https://stackoverflow.com/questions/2084508/clear-terminal-in-python
+	sys.stderr.write("\x1b[2J\x1b[H")
 
 
 def main():
