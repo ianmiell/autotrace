@@ -584,9 +584,6 @@ class PexpectSession(object):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
 		# TODO: if the pane was not 'filled', then mark the session as not scrollable back further.
-		#if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
-		#	print('write_out_session_to_fit_pane ' + str(self.output_lines_end_pane_pointer))
-		#	import code; code.interact(local=dict(globals(), **locals())) 
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
@@ -620,31 +617,35 @@ class PexpectSession(object):
 				# Strip whitespace at end, including \r\n
 				line = line_obj.line_str.rstrip()
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
-					# We are within the realm of the pane now
-					pane_line_counter = 0
+					# We are within the realm of the pane now. plc start at 1.
+					pane_line_counter = 1
 				break_at_end_of_this_line = False
 				# If line is so long that it's going to take over the end of the pane, then bail.
 				# If the pane_line_counter + the number of lines that this line will take up
-				if pane_line_counter is not None and pane_line_counter+((len(line)/width-1)+1) > available_pane_height - 1:
-					break
-				else:
-					while len(line) > width-1:
-						# When we get to the top visible line index, kick off the
-						# counter and up one for each pane line computed.
-						lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
-						line = line[width-1:]
-						if pane_line_counter is not None:
-							pane_line_counter += 1
-							if pane_line_counter > available_pane_height - 1:
-								# Make sure we finish this line, so iterate until done!
-								break_at_end_of_this_line = True
+				num_pane_lines_taken_up = (len(line)/width-1)+1
+				# The following code, while neat, causes a bug where screens do not 'move on'.
+				# BROKEN CODE BEGINS
+				#if pane_line_counter is not None and pane_line_counter+num_pane_lines_taken_up > available_pane_height:
+				#	break
+				#else:
+				while len(line) > width-1:
+					# When we get to the top visible line index, kick off the
+					# counter and up one for each pane line computed.
+					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
+					line = line[width-1:]
+					if pane_line_counter is not None:
+						pane_line_counter += 1
+						if pane_line_counter > available_pane_height:
+							# Make sure we finish this line, so iterate until done!
+							break_at_end_of_this_line = True
+				# BROKEN CODE ENDS
 				if break_at_end_of_this_line:
 					break
 				# Add the remainder of this line.
 				lines_in_pane_str_arr.append([line, output_lines_cursor])
 				if pane_line_counter is not None:
 					pane_line_counter += 1
-				if pane_line_counter is not None and pane_line_counter > available_pane_height - 1:
+				if pane_line_counter is not None and pane_line_counter > available_pane_height:
 					break
 			# Add a status line in the pane
 			line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
