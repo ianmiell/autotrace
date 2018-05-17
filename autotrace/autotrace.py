@@ -14,7 +14,7 @@ from curtsies.input import Input
 # Example code for debug/breakpoint
 #if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
 #	import code; code.interact(local=dict(globals(), **locals())) 
-#	import pdb; pdb.trace()
+#	import pdb; pdb.set_trace()
 
 PY3 = sys.version_info[0] >= 3
 if PY3:
