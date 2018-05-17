@@ -621,15 +621,26 @@ class PexpectSession(object):
 			assert self.session_pane
 			width = self.session_pane.get_width()
 			# We reserve one row at the end as a pane status line
-			available_pane_height = self.session_pane.get_height() - 1
-			lines_in_pane_str_arr  = []
-			last_time_seen         = None
-			output_lines_cursor    = None
-			pane_line_counter      = None
-			if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
-				self.pexpect_session_manager.write_to_manager_logfile('We know where we end but not where we start: end at: ' + str(self.output_lines_end_pane_pointer))
-			if self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is None:
-				self.pexpect_session_manager.write_to_manager_logfile('We know where we start but not where we end: start at: ' + str(self.output_top_visible_line_index))
+			available_pane_height   = self.session_pane.get_height() - 1
+			lines_in_pane_str_arr   = []
+			last_time_seen          = None
+			output_lines_cursor     = None
+			pane_line_counter       = None
+			end_known_but_not_start = None
+			start_known_but_not_end = None
+			start_and_end_known     = None
+			if len(self.output_lines) != 0:
+				if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
+					self.pexpect_session_manager.write_to_manager_logfile('We know where we end but not where we start: end at: ' + str(self.output_lines_end_pane_pointer))
+					end_known_but_not_start = True
+				elif self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is None:
+					self.pexpect_session_manager.write_to_manager_logfile('We know where we start but not where we end: start at: ' + str(self.output_top_visible_line_index))
+					start_known_but_not_end = True
+				elif self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is not None:
+					start_and_end_known = True
+				assert start_known_but_not_end or end_known_but_not_start or start_and_end_known, str(self)
+			else:
+				assert self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
 				if output_lines_cursor is None:
@@ -690,8 +701,8 @@ class PexpectSession(object):
 			output_lines_end_pane_pointer_has_been_set = False
 			for i, line_obj in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
 				# Status on bottom line
-				# If this is on the top, and height + top_y value == i (ie this is the last line of the pane)
-				# OR If this is on the bottom (ie top_y is not 1), and height + top_y == i
+				# If    this is on the top, and height + top_y value == i (ie this is the last line of the pane)
+				#    OR this is on the bottom (ie top_y is not 1), and height + top_y == i
 				if (top_y == 1 and available_pane_height + top_y == i) or (top_y != 1 and available_pane_height + top_y == i):
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
 				else:
