@@ -30,6 +30,8 @@ if PY3:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
 # TODO BUG: zoom in on un-displayed window - numbers should reflect which pane is active, not 0123
+# TODO: rethink output_lines_end_pane_pointer when drawing screen: sometimes we
+#       want it to hard-stop there, sometimes we want to record where the end was when rendered.
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -556,10 +558,10 @@ class PexpectSession(object):
 		output_lines                  - The lines of output. Each line is a
 		                                PexpectSessionLine object.
 		output_lines_end_pane_pointer - Used for scrolling, this tracks which
-		                                output_line index is at the end of the
+		                                output_lines index is at the end of the
 		                                pane as displayed.
 		output_top_visible_line_index - Used for scrolling, this tracks which
-		                                output_line index is at the top of the
+		                                output_lines index is at the top of the
 										pane as displayed.
 		pid                           - The process ID that this session
 		                                spawned.
@@ -624,14 +626,10 @@ class PexpectSession(object):
 			last_time_seen         = None
 			output_lines_cursor    = None
 			pane_line_counter      = None
-			# Means: We know where we end but not where we start (scroll back)
 			if self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is not None:
-				pass
-			# Means: We know where we start but not where we end (scroll forward)
+				self.pexpect_session_manager.write_to_manager_logfile('We know where we end but not where we start: end at: ' + str(self.output_lines_end_pane_pointer))
 			if self.output_top_visible_line_index is not None and self.output_lines_end_pane_pointer is None:
-				pass
-			# Means: We don't know where are! This happens at the start.
-			#assert not (self.output_top_visible_line_index is None and self.output_lines_end_pane_pointer is None)
+				self.pexpect_session_manager.write_to_manager_logfile('We know where we start but not where we end: start at: ' + str(self.output_top_visible_line_index))
 			for line_obj in self.output_lines:
 				# We have moved to the next object in the output_lines array
 				if output_lines_cursor is None:
