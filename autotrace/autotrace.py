@@ -292,10 +292,12 @@ class PexpectSessionManager(object):
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'k':
 						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
+						self.pointers_fixed = True
 						msg = self.scroll_up_one()
 						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
-						#self.status_message = 'you just scrolled up one ' + msg
+						self.status_message = 'you just scrolled up one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
+						self.pointers_fixed = False
 						#self.write_to_manager_logfile(str(self.pexpect_sessions[1]))
 						#sys.exit(1)
 					elif e == 'b':
@@ -499,7 +501,7 @@ class PexpectSessionManager(object):
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_top_visible_line_index += 1
-					if session.output_lines_end_pane_pointer is not None:
+					if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 						session.output_lines_end_pane_pointer -= 1
 				else:
 					return_msg = ' at least one session has hit the top'
@@ -507,11 +509,12 @@ class PexpectSessionManager(object):
 
 	def scroll_up_one(self):
 		return_msg = ''
+		self.end_pointer_is_fixed = True
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					session.output_lines_end_pane_pointer -= 1
-					if session.output_top_visible_line_index is not None:
+					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
 						session.output_top_visible_line_index -= 1
 				else:
 					return_msg = ' at least one session has hit the top'
@@ -523,7 +526,8 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
-					session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
+					if session.output_top_visible_line_index > 0:
+						session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
 					session.output_top_visible_line_index = None
 				else:
 					return_msg = ' at least one session has hit the top'
@@ -590,6 +594,7 @@ class PexpectSession(object):
 		self.command                       = command
 		self.output_lines                  = []
 		self.output_lines_end_pane_pointer = None
+		self.pointers_fixed                = False
 		# Pointer to the uppermost-visible PexpectSessionLine in this pane
 		self.output_top_visible_line_index = None
 		self.pid                           = None
@@ -627,6 +632,8 @@ class PexpectSession(object):
 	def write_out_session_to_fit_pane(self):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
+		if self.session_number == 1:
+			self.pexpect_session_manager.write_to_manager_logfile(str(self))
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
@@ -719,11 +726,12 @@ class PexpectSession(object):
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
 				else:
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [self.session_pane.color(line_obj[0])]
-				if not output_lines_end_pane_pointer_has_been_set:
+				if not output_lines_end_pane_pointer_has_been_set and self.pointers_fixed == False:
 					self.output_lines_end_pane_pointer = line_obj[1]
 					output_lines_end_pane_pointer_has_been_set = True
-				# Record the uppermost-visible line
-				self.output_top_visible_line_index = line_obj[1]
+				if self.pointers_fixed == False:
+					# Record the uppermost-visible line
+					self.output_top_visible_line_index = line_obj[1]
 
 	def spawn(self):
 		self.pexpect_session = pexpect.spawn(self.command)
