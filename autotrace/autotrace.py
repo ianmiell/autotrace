@@ -304,7 +304,7 @@ class PexpectSessionManager(object):
 						self.pointers_fixed = False
 					elif e == 'b':
 						self.pointers_fixed = True
-						msg = self.scroll_back()
+						msg = self.page_forward()
 						self.status_message = 'you just hit back ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						self.pointers_fixed = False
@@ -526,7 +526,7 @@ class PexpectSessionManager(object):
 					return_msg = ' at least one session has hit the top'
 		return return_msg
 
-	def scroll_back(self):
+	def page_forward(self):
 		# for each session: take the pointer, and move the _end_ pointer back to the output_top_visible_line_index - 1 and re-display
 		return_msg = ''
 		for session in self.pexpect_sessions:
@@ -631,8 +631,8 @@ class PexpectSession(object):
 		string += '\noutput_lines length: ' + str(len(self.output_lines))
 		string += '\noutput_lines_end_pane_pointer: ' + str(self.output_lines_end_pane_pointer)
 		string += '\noutput_top_visible_line_index: ' + str(self.output_top_visible_line_index)
-		for line in self.output_lines:
-			string += '\nline: ' + str(line.line_str)
+		#for line in self.output_lines:
+		#	string += '\nline: ' + str(line.line_str)
 		string += '\nsession_pane: ' + str(self.session_pane)
 		string += '\n============= SESSION OBJECT END   ==================='
 		return string
