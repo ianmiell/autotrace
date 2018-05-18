@@ -856,8 +856,11 @@ def process_args():
 	if args.commands == [] and not args.replayfile:
 		pid, command = get_last_run_pid()
 		if pid:
-			#args.commands.append("""bash -c 'while true; do echo "dummy process as we cannot attach to background process: """ + str(pid) + """ with command: """ + command + """ ";sleep 2; done' """)
 			args.commands.append("""echo bg command being tracked is: """ + command)
+			if platform.system() == 'Darwin':
+				args.commands.append('iostat 1')
+			else:
+				args.commands.append('vmstat 1')
 		else:
 			print('No background process found on this terminal session.')
 			sys.exit(1)
