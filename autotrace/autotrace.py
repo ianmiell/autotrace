@@ -29,6 +29,9 @@ if PY3:
 #         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
+# TODO: BUG - down doesn't work at end of first screen
+# TODO: BUG - page back only works once
+
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -502,9 +505,9 @@ class PexpectSessionManager(object):
 		for session in self.pexpect_sessions:
 			if session.session_pane:
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
-					session.output_top_visible_line_index += 1
-					if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
-						session.output_lines_end_pane_pointer -= 1
+					session.output_lines_end_pane_pointer += 1
+					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
+						session.output_top_visible_line_index += 1
 				else:
 					return_msg = ' at least one session has hit the top'
 		return return_msg
