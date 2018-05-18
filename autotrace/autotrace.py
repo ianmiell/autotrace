@@ -843,7 +843,8 @@ def process_args():
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
 	parser.add_argument('-v', action='store_const', const=True, default=None, help='Split vertically rather than horizontally (the default).')
 	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
-	parser.add_argument('--replayfile', help='Replay output of an individual file')
+	parser.add_argument('--replay', nargs='?', help='Replay output of a folder. Optionally, you can give the pid of the process that is in the filenames if there are more than one set of logfiles in the folder.')
+	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
@@ -904,10 +905,45 @@ def clear_screen():
 	sys.stderr.write("\x1b[0")
 
 
+def replay_file(filename):
+	assert isinstance(filename,str)
+	try:
+		file_content = open(filename,'r').read()
+	except FileNotFoundError:
+		quit_autotrace_before_run('Replay file: "' + filename + '" not found')
+	print(file_content)
+
+def replay_dir(spec):
+	# For each file in the directory that matches the spec, spin up a session that runs:
+	# autotrace --replayfile <FILENAME>
+	replaydir = None
+	replaypid = None
+	if len(spec) == 1:
+		replaydir = spec[0]
+		replaypid = '.*'
+	elif len(spec) == 2:
+		replaypid = spec[1]
+	else:
+		quit_autotrace_before_run('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
+	assert replaydir is not None
+	assert isinstance(replaydir,str)
+	# TODO:
+	# Collect the files in folder that match: <n>.autotrace.<pid>.log
+	# 
+	# Order them by number.
+	# 0 is the main session, 1,2, etc
+	# For each session, run '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
+
+def quit_autotrace_before_run(msg):
+	print(msg)
+	sys.exit(1)
+
 def main():
 	args = process_args()
 	if args.replayfile:
-		print('replayfile')
+		replay_file(args.replayfile[0])
+	if args.replay:
+		replay_dir(args.replay)
 	elif args.commands:
 		pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 		pexpect_session_manager.initialize_commands(args)
