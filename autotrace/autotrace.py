@@ -905,17 +905,19 @@ def clear_screen():
 	sys.stderr.write("\x1b[0")
 
 
-def replay_file(filename):
+def replay_file(filename,pexpect_session_manager):
 	assert isinstance(filename,str)
 	try:
 		file_content = open(filename,'r').read()
 	except FileNotFoundError:
-		quit_autotrace_before_run('Replay file: "' + filename + '" not found')
+		quit_autotrace('Replay file: "' + filename + '" not found')
+	# TODO: Read each line
 	print(file_content)
 
-def replay_dir(spec):
+def replay_dir(args, pexpect_session_manager):
 	# For each file in the directory that matches the spec, spin up a session that runs:
 	# autotrace --replayfile <FILENAME>
+	spec = args.replay
 	replaydir = None
 	replaypid = None
 	if len(spec) == 1:
@@ -924,7 +926,7 @@ def replay_dir(spec):
 	elif len(spec) == 2:
 		replaypid = spec[1]
 	else:
-		quit_autotrace_before_run('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
+		quit_autotrace('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
 	assert replaydir is not None
 	assert isinstance(replaydir,str)
 	# TODO:
@@ -932,20 +934,23 @@ def replay_dir(spec):
 	# 
 	# Order them by number.
 	# 0 is the main session, 1,2, etc
-	# For each session, run '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
+	# For each session, create a session with command: '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
+	for logfilename in logfilenames:
+		#session_command = TODO - this binary + ' --replayfile ' + logfilename
+		#TODO: set up args.commands with these commands
+		pass
+	
+	pexpect_session_manager.initialize_commands(args)
 
-def quit_autotrace_before_run(msg):
-	print(msg)
-	sys.exit(1)
 
 def main():
 	args = process_args()
+	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 	if args.replayfile:
 		replay_file(args.replayfile[0])
-	if args.replay:
-		replay_dir(args.replay)
+	elif args.replay:
+		replay_dir(args)
 	elif args.commands:
-		pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 		pexpect_session_manager.initialize_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
