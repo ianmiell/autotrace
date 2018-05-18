@@ -30,7 +30,6 @@ if PY3:
 #         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
-# TODO: BUG - page back only works once you git it twice
 # TODO: BUG - down doesn't work at end of first screen
 
 
