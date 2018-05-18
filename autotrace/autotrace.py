@@ -292,11 +292,13 @@ class PexpectSessionManager(object):
 						self.unpause_sessions()
 						self.status = 'Running'
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
+						self.pointers_fixed = False
 						break
 					elif e == 'j':
 						msg = self.scroll_down_one()
 						self.status_message = 'you just scrolled down one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
+						self.pointers_fixed = False
 					elif e == 'k':
 						msg = self.scroll_up_one()
 						self.status_message = 'you just scrolled up one ' + msg
@@ -314,7 +316,7 @@ class PexpectSessionManager(object):
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						self.pointers_fixed = False
 					else:
-						self.write_to_manager_logfile('input_char: ' + input_char)
+						self.write_to_manager_logfile('input_char unhandled in paused: ' + input_char)
 			elif input_char in (u'h',):
 				# Handle help state
 				self.status = 'Help'
@@ -339,8 +341,9 @@ class PexpectSessionManager(object):
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						break
 					else:
-						self.write_to_manager_logfile('input_char: ' + input_char)
-
+						self.write_to_manager_logfile('input_char unhandled in help: ' + input_char)
+				else:
+					self.write_to_manager_logfile('input_char unhandled in wider loop: ' + input_char)
 
 	# Handles initial placement of sessions and panes.
 	def initialize_commands(self, args):
