@@ -907,19 +907,22 @@ def clear_screen():
 	sys.stderr.write("\x1b[0")
 
 
-def replay_file(filename,pexpect_session_manager):
+def replay_file(pexpect_session_manager, filename):
 	assert isinstance(filename,str)
 	try:
 		file_content = open(filename,'r').read()
 	except FileNotFoundError:
-		quit_autotrace('Replay file: "' + filename + '" not found')
+		pexpect_session_manager.quit_autotrace('Replay file: "' + filename + '" not found')
 	# TODO: Read each line
 	print(file_content)
 
 def replay_dir(pexpect_session_manager, args):
 	# For each file in the directory that matches the spec, spin up a session that runs:
 	# autotrace --replayfile <FILENAME>
-	spec = args.replay
+	if isinstance(args.replay, str):
+		spec = [args.replay]
+	else:
+		spec = args.replay
 	replaydir = None
 	replaypid = None
 	if len(spec) == 1:
@@ -928,19 +931,24 @@ def replay_dir(pexpect_session_manager, args):
 	elif len(spec) == 2:
 		replaypid = spec[1]
 	else:
-		quit_autotrace('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
+		pexpect_session_manager.quit_autotrace('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
 	assert replaydir is not None
 	assert isinstance(replaydir,str)
 	if not os.path.isdir(replaydir):
-		quit_autotrace('Replay directory: "' + replaydir + '" is not a folder')
-	# TODO:
+		pexpect_session_manager.quit_autotrace('Replay directory: "' + replaydir + '" is not a folder')
 	# Collect the files in folder that match: <n>.autotrace.<pid>.log
-	# 
-	# Order them by number.
-	# 0 is the main session, 1,2, etc
 	# For each session, create a session with command: '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
 	logfilenames = os.listdir(replaydir)
+	logfilenames_dict = {}
 	for logfilename in logfilenames:
+		if re.match('[0-9]+.autotrace.[0-9]+.log',logfilename):
+			num = int(logfilename.split('.')[0])
+			logfilenames_dict.update({num:logfilename})
+			print(num)
+	# Order them by number.
+	# 0 is the main session, 1,2, etc
+	for c in range(0,len(logfilenames_dict)):
+		logfilename = logfilenames_dict[c]
 		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + logfilename
 		args.commands.append(session_command)
 	pexpect_session_manager.initialize_commands(args)
@@ -950,7 +958,7 @@ def main():
 	args = process_args()
 	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 	if args.replayfile:
-		replay_file(args.replayfile[0])
+		replay_file(pexpect_session_manager, args.replayfile[0])
 	elif args.replay:
 		replay_dir(pexpect_session_manager, args)
 	elif args.commands:
