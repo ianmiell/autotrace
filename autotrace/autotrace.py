@@ -918,15 +918,17 @@ def replay_file(pexpect_session_manager, filename):
 		file_content = open(filename,'r').read()
 	except FileNotFoundError:
 		pexpect_session_manager.quit_autotrace('Replay file: "' + filename + '" not found')
+	last_time_seen = 0.0
 	for line in file_content.split('\n'):
 		line = line.strip()
 		if len(line) == 0:
 			continue
 		line_list = line.split(' ')
 		assert len(line_list) > 0
-		time_to_wait = line_list[0]
-		# TODO: make the time match the real time rather than a naive wait.
-		time.sleep(float(time_to_wait))
+		elapsed_time = float(line_list[0])
+		time_to_wait = elapsed_time - last_time_seen
+		last_time_seen = elapsed_time
+		time.sleep(time_to_wait)
 		line_type = line_list[1]
 		if line_type == 'program_output':
 			if len(line_list) > 2:
