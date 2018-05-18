@@ -198,6 +198,7 @@ class PexpectSessionManager(object):
 
 	def handle_sessions(self):
 		seen_output = False
+		all_done    = False
 		lines_seen = {}
 		while not seen_output:
 			a_session_is_still_active = False
@@ -208,16 +209,18 @@ class PexpectSessionManager(object):
 					lines_seen.update({session:True})
 				if session.pexpect_session is not None:
 					a_session_is_still_active = True
-					self.debug_msg('session: ' + str(session) + ' is still active')
+					#self.debug_msg('session: ' + str(session) + ' is still active')
 			if not a_session_is_still_active:
 				self.debug_msg('All sessions complete, breaking out')
+				all_done = True
 				break
 		# Determine which ones saw output.
 		# The ones that did not need to 'fake read' a line of type 'display_sync_line'
-		assert seen_output
-		for session in self.pexpect_sessions:
-			if not lines_seen[session]:
-				session.append_output_line('','display_sync_line')
+		assert seen_output or all_done
+		if seen_output:
+			for session in self.pexpect_sessions:
+				if not lines_seen[session]:
+					session.append_output_line('','display_sync_line')
 
 	def get_quick_help(self):
 		if self.status == 'Running':
@@ -648,8 +651,6 @@ class PexpectSession(object):
 	def write_out_session_to_fit_pane(self):
 		"""This function is responsible for taking the state of the session and writing it out to its pane.
 		"""
-		if self.session_number == 1:
-			self.pexpect_session_manager.write_to_manager_logfile(str(self))
 		if self.session_pane:
 			assert self.session_pane
 			width = self.session_pane.get_width()
@@ -924,9 +925,6 @@ def replay_file(pexpect_session_manager, filename):
 		line_list = line.split(' ')
 		assert len(line_list) > 0
 		time_to_wait = line_list[0]
-		print(filename)
-		print(line_list)
-		print(time_to_wait)
 		time.sleep(float(time_to_wait))
 		if len(line_list) > 1:
 			line_str = ' '.join(line_list[1:])
@@ -962,11 +960,11 @@ def replay_dir(pexpect_session_manager, args):
 			logfilenames_dict.update({num:logfilename})
 	# Order them by number.
 	# 0 is the main session, 1,2, etc
+	print(str(len(logfilenames_dict)))
 	for c in range(0,len(logfilenames_dict)):
 		logfilename = logfilenames_dict[c]
 		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + replaydir + '/' + logfilename
 		args.commands.append(session_command)
-	pexpect_session_manager.initialize_commands(args)
 
 
 def main():
@@ -974,27 +972,28 @@ def main():
 	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 	if args.replayfile:
 		replay_file(pexpect_session_manager, args.replayfile[0])
-	elif args.replay:
-		replay_dir(pexpect_session_manager, args)
-	if args.commands:
-		pexpect_session_manager.initialize_commands(args)
-		main_command_session = None
-		for session in pexpect_session_manager.pexpect_sessions:
-			if session.session_number == 0:
-				main_command_session = session
-			else:
-				session.spawn()
-		assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
-		pexpect.run('kill -CONT ' + str(main_command_session.pid))
-		while True:
-			try:
-				while True:
-					pexpect_session_manager.draw_screen('sessions',quick_help=pexpect_session_manager.get_quick_help())
-					pexpect_session_manager.handle_sessions()
-					pexpect_session_manager.handle_input()
-			except KeyboardInterrupt:
-				pexpect_session_manager.draw_screen('clearscreen',quick_help=pexpect_session_manager.get_quick_help())
-				pexpect_session_manager.refresh_window()
+	else:
+		if args.replay:
+			replay_dir(pexpect_session_manager, args)
+		if args.commands:
+			pexpect_session_manager.initialize_commands(args)
+			main_command_session = None
+			for session in pexpect_session_manager.pexpect_sessions:
+				if session.session_number == 0:
+					main_command_session = session
+				else:
+					session.spawn()
+			assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
+			pexpect.run('kill -CONT ' + str(main_command_session.pid))
+			while True:
+				try:
+					while True:
+						pexpect_session_manager.draw_screen('sessions',quick_help=pexpect_session_manager.get_quick_help())
+						pexpect_session_manager.handle_sessions()
+						pexpect_session_manager.handle_input()
+				except KeyboardInterrupt:
+					pexpect_session_manager.draw_screen('clearscreen',quick_help=pexpect_session_manager.get_quick_help())
+					pexpect_session_manager.refresh_window()
 
 ################################################################################
 # Basic flow of application
