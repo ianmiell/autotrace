@@ -939,15 +939,10 @@ def replay_dir(pexpect_session_manager, args):
 	# Order them by number.
 	# 0 is the main session, 1,2, etc
 	# For each session, create a session with command: '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
-	print(sys.argv)
 	logfilenames = os.listdir(replaydir)
 	for logfilename in logfilenames:
-		#session_command = TODO - this binary + ' --replayfile ' + logfilename
-		#TODO: set up args.commands with these commands
-		print(logfilename)
-		sys.exit(1)
-		pass
-	
+		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + logfilename
+		args.commands.append(session_command)
 	pexpect_session_manager.initialize_commands(args)
 
 
