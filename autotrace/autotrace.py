@@ -298,7 +298,6 @@ class PexpectSessionManager(object):
 						self.status_message = 'you just scrolled down one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 					elif e == 'k':
-						self.pointers_fixed = True
 						msg = self.scroll_up_one()
 						self.status_message = 'you just scrolled up one ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
@@ -509,6 +508,7 @@ class PexpectSessionManager(object):
 					session.output_lines_end_pane_pointer += 1
 					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
 						session.output_top_visible_line_index += 1
+						self.pointers_fixed = True
 				else:
 					return_msg = ' at least one session has hit the top'
 		return return_msg
@@ -521,6 +521,7 @@ class PexpectSessionManager(object):
 					session.output_lines_end_pane_pointer -= 1
 					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
 						session.output_top_visible_line_index -= 1
+						self.pointers_fixed = True
 				else:
 					return_msg = ' at least one session has hit the top'
 		return return_msg
