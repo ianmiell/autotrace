@@ -44,6 +44,9 @@ class PexpectSessionManager(object):
 		"""
 		assert self.only_one is None
 		self.only_one             = True
+		self.root_ready           = False
+		if os.getuid() == 0:
+			self.root_ready = True
 		self.debug                = debug
 		self.pexpect_sessions     = []
 		self.status               = 'Running'
@@ -62,15 +65,14 @@ class PexpectSessionManager(object):
 		else:
 			self.logdir               = '/tmp/tmp_autotrace/' + str(self.pid)
 			os.system('mkdir -p ' + self.logdir)
-			os.system('chmod -R 777 /tmp/tmp_autotrace')
+			if self.root_ready:
+				os.system('chmod -R 777 /tmp/tmp_autotrace')
 		self.logfilename          = self.logdir + '/manager.autotrace.' + str(self.pid) + '.log'
 		self.logfile              = open(self.logfilename,'w+')
 		os.chmod(self.logfilename,0o777)
 		# Does user have root?
 		# TODO: emit warning if not root?
 		self.root_ready     = False
-		if os.getuid() == 0:
-			self.root_ready = True
 		# Setup
 		self.refresh_window()
 		self.start_time            = time.time()
@@ -853,7 +855,7 @@ def process_args():
 		print('-v and more than two commands supplied. -v does not make sense, so dropping that arg.')
 		args.v = False
 		time.sleep(1)
-	if args.commands == [] and not args.replayfile:
+	if args.commands == [] and not args.replayfile and not args.replay:
 		pid, command = get_last_run_pid()
 		if pid:
 			args.commands.append("""echo bg command being tracked is: """ + command)
@@ -913,9 +915,9 @@ def replay_file(filename,pexpect_session_manager):
 	# TODO: Read each line
 	print(file_content)
 
-def replay_dir(args, pexpect_session_manager):
+def replay_dir(pexpect_session_manager, args):
 	# For each file in the directory that matches the spec, spin up a session that runs:
-	# autotrace --replayfile <FILENAME>
+	# autotrace --replayfile <FILENAME>
 	spec = args.replay
 	replaydir = None
 	replaypid = None
@@ -928,15 +930,21 @@ def replay_dir(args, pexpect_session_manager):
 		quit_autotrace('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
 	assert replaydir is not None
 	assert isinstance(replaydir,str)
-	# TODO:
+	if not os.path.isdir(replaydir):
+		quit_autotrace('Replay directory: "' + replaydir + '" is not a folder')
+	# TODO:
 	# Collect the files in folder that match: <n>.autotrace.<pid>.log
 	# 
 	# Order them by number.
 	# 0 is the main session, 1,2, etc
 	# For each session, create a session with command: '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
+	print(sys.argv)
+	logfilenames = os.listdir(replaydir)
 	for logfilename in logfilenames:
 		#session_command = TODO - this binary + ' --replayfile ' + logfilename
 		#TODO: set up args.commands with these commands
+		print(logfilename)
+		sys.exit(1)
 		pass
 	
 	pexpect_session_manager.initialize_commands(args)
@@ -948,7 +956,7 @@ def main():
 	if args.replayfile:
 		replay_file(args.replayfile[0])
 	elif args.replay:
-		replay_dir(args)
+		replay_dir(pexpect_session_manager, args)
 	elif args.commands:
 		pexpect_session_manager.initialize_commands(args)
 		main_command_session = None
