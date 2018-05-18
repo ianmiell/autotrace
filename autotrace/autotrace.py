@@ -29,8 +29,8 @@ if PY3:
 #         - start a autotrace process (because we know autotrace will be installed) that:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
-# TODO: BUG - down doesn't work at end of first screen
 # TODO: BUG - page back only works once
+# TODO: BUG - down doesn't work at end of first screen
 
 
 class PexpectSessionManager(object):
@@ -313,6 +313,7 @@ class PexpectSessionManager(object):
 						msg = self.scroll_forward()
 						self.status_message = 'you just hit forward ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
+						self.pointers_fixed = False
 					else:
 						self.write_to_manager_logfile('input_char: ' + input_char)
 			elif input_char in (u'h',):
@@ -532,6 +533,7 @@ class PexpectSessionManager(object):
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
 						session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
+						self.pointers_fixed = True
 					session.output_top_visible_line_index = None
 				else:
 					return_msg = ' at least one session has hit the top'
@@ -545,6 +547,7 @@ class PexpectSessionManager(object):
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer < len(session.output_lines):
 					session.output_top_visible_line_index = session.output_lines_end_pane_pointer+1
 					session.output_lines_end_pane_pointer = None
+					self.pointers_fixed = True
 				else:
 					return_msg = ' at least one session has hit the end'
 		return return_msg
