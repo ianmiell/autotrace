@@ -13,6 +13,7 @@ from curtsies.input import Input
 
 # Example code for debug/breakpoint
 #if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
+#   print("\nrestore terminal? import os; os.system('stty sane')\n")
 #	import code; code.interact(local=dict(globals(), **locals()))
 #	import pdb; pdb.set_trace()
 
