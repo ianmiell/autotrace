@@ -842,7 +842,8 @@ def process_args():
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
 	parser.add_argument('-v', action='store_const', const=True, default=None, help='Split vertically rather than horizontally (the default).')
 	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
-	parser.add_argument('--replayfile', help='Replay output of an individual file')
+	parser.add_argument('--replay', nargs='?', help='Replay output of a folder. Optionally, you can give the pid of the process that is in the filenames if there are more than one set of logfiles in the folder.')
+	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
@@ -903,12 +904,52 @@ def clear_screen():
 	sys.stderr.write("\x1b[0")
 
 
+def replay_file(filename,pexpect_session_manager):
+	assert isinstance(filename,str)
+	try:
+		file_content = open(filename,'r').read()
+	except FileNotFoundError:
+		quit_autotrace('Replay file: "' + filename + '" not found')
+	# TODO: Read each line
+	print(file_content)
+
+def replay_dir(args, pexpect_session_manager):
+	# For each file in the directory that matches the spec, spin up a session that runs:
+	# autotrace --replayfile <FILENAME>
+	spec = args.replay
+	replaydir = None
+	replaypid = None
+	if len(spec) == 1:
+		replaydir = spec[0]
+		replaypid = '.*'
+	elif len(spec) == 2:
+		replaypid = spec[1]
+	else:
+		quit_autotrace('Wrong number of arguments passed to --replay: ' + str(len(spec)) + '\nShould be at most two.')
+	assert replaydir is not None
+	assert isinstance(replaydir,str)
+	# TODO:
+	# Collect the files in folder that match: <n>.autotrace.<pid>.log
+	# 
+	# Order them by number.
+	# 0 is the main session, 1,2, etc
+	# For each session, create a session with command: '<<THIS BINARY/python invocation>> --replayfile <<FILENAME>>
+	for logfilename in logfilenames:
+		#session_command = TODO - this binary + ' --replayfile ' + logfilename
+		#TODO: set up args.commands with these commands
+		pass
+	
+	pexpect_session_manager.initialize_commands(args)
+
+
 def main():
 	args = process_args()
+	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 	if args.replayfile:
-		print('replayfile')
+		replay_file(args.replayfile[0])
+	elif args.replay:
+		replay_dir(args)
 	elif args.commands:
-		pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
 		pexpect_session_manager.initialize_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
