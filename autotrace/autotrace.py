@@ -13,7 +13,7 @@ from curtsies.input import Input
 
 # Example code for debug/breakpoint
 #if self.pexpect_session_manager.trigger_debug and self.session_number == 1:
-#	import code; code.interact(local=dict(globals(), **locals())) 
+#	import code; code.interact(local=dict(globals(), **locals()))
 #	import pdb; pdb.set_trace()
 
 PY3 = sys.version_info[0] >= 3
@@ -255,7 +255,6 @@ class PexpectSessionManager(object):
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
 			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
 				if self.zoomed_session is None:
-					number_of_sessions = len(self.pexpect_sessions)
 					# Only accept if pane is assigned to this session.
 					if self.get_pane_by_session_number(int(input_char)) is not None:
 						# Set session as zoomed.
@@ -728,10 +727,10 @@ class PexpectSession(object):
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
 				else:
 					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [self.session_pane.color(line_obj[0])]
-				if not output_lines_end_pane_pointer_has_been_set and self.pexpect_session_manager.pointers_fixed == False:
+				if not output_lines_end_pane_pointer_has_been_set and self.pexpect_session_manager.pointers_fixed is False:
 					self.output_lines_end_pane_pointer = line_obj[1]
 					output_lines_end_pane_pointer_has_been_set = True
-				if self.pexpect_session_manager.pointers_fixed == False:
+				if self.pexpect_session_manager.pointers_fixed is False:
 					# Record the uppermost-visible line
 					self.output_top_visible_line_index = line_obj[1]
 
