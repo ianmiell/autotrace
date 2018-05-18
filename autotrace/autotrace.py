@@ -31,6 +31,7 @@ if PY3:
 #           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
 #           - should the first line of the logfile be the command name?
 # TODO: BUG - down doesn't work at end of first screen
+# TODO: tar up logfiles as a bug report
 
 
 class PexpectSessionManager(object):
