@@ -200,12 +200,18 @@ class PexpectSessionManager(object):
 		seen_output = False
 		lines_seen = {}
 		while not seen_output:
+			a_session_is_still_active = False
 			for session in self.pexpect_sessions:
 				lines_seen.update({session:False})
 				if session.read_line():
 					seen_output = True
 					lines_seen.update({session:True})
-		#time.sleep(1)
+				if session.pexpect_session is not None:
+					a_session_is_still_active = True
+					self.debug_msg('session: ' + str(session) + ' is still active')
+			if not a_session_is_still_active:
+				self.debug_msg('All sessions complete, breaking out')
+				break
 		# Determine which ones saw output.
 		# The ones that did not need to 'fake read' a line of type 'display_sync_line'
 		assert seen_output
@@ -535,8 +541,6 @@ class PexpectSessionManager(object):
 		return_msg = ''
 		for session in self.pexpect_sessions:
 			if session.session_pane:
-				if session.session_number==1:
-					self.debug_msg(str(session))
 				if session.output_lines_end_pane_pointer is not None and session.output_lines_end_pane_pointer > 0:
 					if session.output_top_visible_line_index is not None and session.output_top_visible_line_index > 0:
 						session.output_lines_end_pane_pointer = session.output_top_visible_line_index-1
@@ -913,8 +917,20 @@ def replay_file(pexpect_session_manager, filename):
 		file_content = open(filename,'r').read()
 	except FileNotFoundError:
 		pexpect_session_manager.quit_autotrace('Replay file: "' + filename + '" not found')
-	# TODO: Read each line
-	print(file_content)
+	for line in file_content.split('\r\n'):
+		line = line.strip()
+		if len(line) == 0:
+			continue
+		line_list = line.split(' ')
+		assert len(line_list) > 0
+		time_to_wait = line_list[0]
+		print(filename)
+		print(line_list)
+		print(time_to_wait)
+		time.sleep(float(time_to_wait))
+		if len(line_list) > 1:
+			line_str = ' '.join(line_list[1:])
+			print(line_str)
 
 def replay_dir(pexpect_session_manager, args):
 	# For each file in the directory that matches the spec, spin up a session that runs:
@@ -944,12 +960,11 @@ def replay_dir(pexpect_session_manager, args):
 		if re.match('[0-9]+.autotrace.[0-9]+.log',logfilename):
 			num = int(logfilename.split('.')[0])
 			logfilenames_dict.update({num:logfilename})
-			print(num)
 	# Order them by number.
 	# 0 is the main session, 1,2, etc
 	for c in range(0,len(logfilenames_dict)):
 		logfilename = logfilenames_dict[c]
-		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + logfilename
+		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + replaydir + '/' + logfilename
 		args.commands.append(session_command)
 	pexpect_session_manager.initialize_commands(args)
 
@@ -961,7 +976,7 @@ def main():
 		replay_file(pexpect_session_manager, args.replayfile[0])
 	elif args.replay:
 		replay_dir(pexpect_session_manager, args)
-	elif args.commands:
+	if args.commands:
 		pexpect_session_manager.initialize_commands(args)
 		main_command_session = None
 		for session in pexpect_session_manager.pexpect_sessions:
