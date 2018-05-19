@@ -963,7 +963,6 @@ def replay_dir(pexpect_session_manager, args):
 			logfilenames_dict.update({num:logfilename})
 	# Order them by number.
 	# 0 is the main session, 1,2, etc
-	print(str(len(logfilenames_dict)))
 	for c in range(0,len(logfilenames_dict)):
 		logfilename = logfilenames_dict[c]
 		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + replaydir + '/' + logfilename
