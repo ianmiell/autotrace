@@ -681,7 +681,7 @@ class PexpectSession(object):
 				else:
 					output_lines_cursor += 1
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
-					# We are within the realm of the pane now. plc starts at 0.
+					# We are within the realm of the pane now. plc starts at 1.
 					pane_line_counter = 1
 				# If we go past the output line pointer, then break - we don't want to see any later lines.
 				if self.output_lines_end_pane_pointer is not None and output_lines_cursor > self.output_lines_end_pane_pointer:
@@ -714,17 +714,21 @@ class PexpectSession(object):
 				# BROKEN CODE ENDS
 				if break_at_end_of_this_line:
 					break
-				# Add the remainder of this line.
-				lines_in_pane_str_arr.append([line, output_lines_cursor])
-				if pane_line_counter is not None:
-					pane_line_counter += 1
-				if pane_line_counter is not None and pane_line_counter > available_pane_height:
-					break
+				else:
+					# Add the remainder of this line.
+					lines_in_pane_str_arr.append([line, output_lines_cursor])
+					if pane_line_counter is not None:
+						pane_line_counter += 1
+						if pane_line_counter > available_pane_height:
+							break
 			# Add a status line in the pane
 			line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
 			line_str = line_str[:pane_width]
+			took_up_whole_pane = False
 			if lines_in_pane_str_arr:
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor+1])
+				if pane_line_counter is not None and pane_line_counter > available_pane_height:
+					took_up_whole_pane = True
 			else:
 				# Nothing to display - just display the status line.
 				if output_lines_cursor is None:
@@ -746,10 +750,7 @@ class PexpectSession(object):
 					output_lines_end_pane_pointer_has_been_set = True
 				if self.pexpect_session_manager.pointers_fixed is False:
 					# Record the uppermost-visible line
-					if pane_line_counter is None:
-						self.output_top_visible_line_index = line_obj[1]
-					else:
-						self.output_top_visible_line_index = line_obj[1]
+					self.output_top_visible_line_index = line_obj[1]
 
 
 	def spawn(self):
