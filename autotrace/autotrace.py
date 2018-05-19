@@ -22,7 +22,6 @@ PY3 = sys.version_info[0] >= 3
 if PY3:
 	unicode = str
 
-# TODO: remove cursor/turn echo off (how?)
 # TODO: BUG - down doesn't work at end of first screen
 # TODO: tar up logfiles as a bug report
 
@@ -651,7 +650,8 @@ class PexpectSession(object):
 		"""
 		if self.session_pane:
 			assert self.session_pane
-			width = self.session_pane.get_width()
+			pane_width  = self.session_pane.get_width()
+			pane_height = self.session_pane.get_height()
 			# We reserve one row at the end as a pane status line
 			available_pane_height   = self.session_pane.get_height() - 1
 			lines_in_pane_str_arr   = []
@@ -681,7 +681,7 @@ class PexpectSession(object):
 				else:
 					output_lines_cursor += 1
 				if pane_line_counter is None and self.output_top_visible_line_index == output_lines_cursor:
-					# We are within the realm of the pane now. plc starts at 1.
+					# We are within the realm of the pane now. plc starts at 0.
 					pane_line_counter = 1
 				# If we go past the output line pointer, then break - we don't want to see any later lines.
 				if self.output_lines_end_pane_pointer is not None and output_lines_cursor > self.output_lines_end_pane_pointer:
@@ -695,17 +695,17 @@ class PexpectSession(object):
 				break_at_end_of_this_line = False
 				# If line is so long that it's going to take over the end of the pane, then bail.
 				# If the pane_line_counter + the number of lines that this line will take up
-				#num_pane_lines_taken_up = (len(line)/width-1)+1
+				#num_pane_lines_taken_up = (len(line)/pange_width-1)+1
 				# The following code, while neat, causes a bug where screens do not 'move on'.
 				# BROKEN CODE BEGINS
 				#if pane_line_counter is not None and pane_line_counter+num_pane_lines_taken_up > available_pane_height:
 				#	break
 				#else:
-				while len(line) > width-1:
+				while len(line) > pane_width-1:
 					# When we get to the top visible line index, kick off the
 					# counter and up one for each pane line computed.
-					lines_in_pane_str_arr.append([line[:width-1], output_lines_cursor])
-					line = line[width-1:]
+					lines_in_pane_str_arr.append([line[:pane_width-1], output_lines_cursor])
+					line = line[pane_width-1:]
 					if pane_line_counter is not None:
 						pane_line_counter += 1
 						if pane_line_counter > available_pane_height:
@@ -722,7 +722,7 @@ class PexpectSession(object):
 					break
 			# Add a status line in the pane
 			line_str = 'Session no: ' + str(self.session_number) + ', command: ' + self.command
-			line_str = line_str[:self.session_pane.get_width()]
+			line_str = line_str[:pane_width]
 			if lines_in_pane_str_arr:
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor+1])
 			else:
@@ -730,8 +730,8 @@ class PexpectSession(object):
 				if output_lines_cursor is None:
 					output_lines_cursor = 0
 				lines_in_pane_str_arr.append([line_str, output_lines_cursor])
-			top_y    = self.session_pane.top_left_y
-			bottom_y = self.session_pane.bottom_right_y
+			top_y                                      = self.session_pane.top_left_y
+			bottom_y                                   = self.session_pane.bottom_right_y
 			output_lines_end_pane_pointer_has_been_set = False
 			for i, line_obj in zip(reversed(range(top_y,bottom_y)), reversed(lines_in_pane_str_arr)):
 				# Status on bottom line
@@ -746,7 +746,11 @@ class PexpectSession(object):
 					output_lines_end_pane_pointer_has_been_set = True
 				if self.pexpect_session_manager.pointers_fixed is False:
 					# Record the uppermost-visible line
-					self.output_top_visible_line_index = line_obj[1]
+					if pane_line_counter is None:
+						self.output_top_visible_line_index = line_obj[1]
+					else:
+						self.output_top_visible_line_index = line_obj[1]
+
 
 	def spawn(self):
 		self.pexpect_session = pexpect.spawn(self.command)
@@ -862,6 +866,10 @@ def process_args():
 	if args.commands == [] and not args.replayfile and not args.replay:
 		pid, command = get_last_run_pid()
 		if pid is None and command is None:
+			# TODO: find a process: ps -u imiell -a
+			#
+			#       ps -u imiell -a -o pid=,tt= | grep -vw '?$'
+			#       If linux, just look for processes with pts ttys
 			print('No background process found on this terminal session.')
 			sys.exit(1)
 		if command:
