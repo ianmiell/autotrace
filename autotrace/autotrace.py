@@ -861,15 +861,19 @@ def process_args():
 		time.sleep(1)
 	if args.commands == [] and not args.replayfile and not args.replay:
 		pid, command = get_last_run_pid()
-		if pid:
-			args.commands.append("""echo bg command being tracked is: """ + command)
-			if platform.system() == 'Darwin':
-				args.commands.append('iostat 1')
-			else:
-				args.commands.append('vmstat 1')
-		else:
+		if pid is None and command is None:
 			print('No background process found on this terminal session.')
 			sys.exit(1)
+		if command:
+			args.commands.append(command)
+		elif pid is not None:
+			args.commands.append("""echo bg command being tracked is: """ + command)
+		args.commands.append('iostat 1')
+		if pid is not None and platform.system() != 'Darwin':
+ 			args.commands.append("""bash -c 'while true; do cat /proc/""" + str(pid) + """/status; sleep 2; done""")
+		elif pid is None and platform.system() != 'Darwin':
+ 			args.commands.append("""bash -c 'while true; do cat /proc/PID/status; sleep 2; done""")
+		args.commands.append('vmstat 1')
 	# Validate END
 	# BUG! if logtimestep is false it's broked - is it?
 	#args.logtimestep = True
@@ -880,20 +884,61 @@ def get_last_run_pid(encoding='utf-8'):
 	mytty = pexpect.run('ps -o tt= -p ' + str(os.getpid())).decode(encoding).strip()
 	# ps -o etime | sort -r gets them in order.
 	# The grep gets all processes with the same tty
-	pses = pexpect.run("""bash -c '(export LC_ALL=C; ps -o etime=,tt=,pid=,args= | sort -r)'""").decode(encoding).strip()
+	pses = pexpect.run("""bash -c '(export LC_ALL=C; ps -a -o etime=,tt=,pid=,args= | sort -r)'""").decode(encoding).strip()
 	pses = pses.split('\r\n')
 	pses_on_this_tty = []
 	for line in pses:
 		line_list = re.split(r'\s+', line.strip())
 		if line_list[1] == mytty:
 			pses_on_this_tty.append(line_list)
-	# Drop the first and last one, as they're the shell and this python process respectively.
-	pses_on_this_tty = pses_on_this_tty[1:-1]
+	if len(pses_on_this_tty) == 2:
+		# Drop last one, as it's this python process.
+		pses_on_this_tty = [pses_on_this_tty[0]]
+	else:
+		# Drop the first and last one, as they're the shell and this python process respectively.
+		pses_on_this_tty = pses_on_this_tty[1:-1]
 	# Take the last one in this list, as that's the last-started background process
 	if len(pses_on_this_tty):
 		pid = pses_on_this_tty[-1][2]
-		command = pses_on_this_tty[-1][3:]
-		return int(pid), ' '.join(command)
+		command = ' '.join(pses_on_this_tty[-1][3:])
+		pexpect.run('kill -STOP ' + pid)
+		clear_screen()
+		print('''
+
+OOK, you are about to attach to the origin command:
+
+	''' + command + '''
+
+which has been suspended until you choose to continue or quit.
+
+Output of the original command is not easily redirected away from this terminal.
+However, you can replay the autotrace once the process is finished with:
+
+	autotrace --replay <LOGDIR>
+
+You have some choices:
+
+- Enter           - restart the command and trace
+- q and Enter     - restart the original command and quit
+- z and Enter     - change nothing, just quit
+- r and Enter     - kill off the already-started process and re-run with autotrace
+
+=> ''')
+		if PY3:
+			resp = input()
+		else:
+			resp = raw_input()
+		# Redirect output? Can't without other deps, but can replay
+		if resp in ('z','Z'):
+			sys.exit(0)
+		if resp in ('r','R'):
+			pexpect.run('kill -KILL ' + pid)
+			return None, command
+		elif resp in ('q','Q','',''):
+			pexpect.run('kill -CONT ' + pid)
+		if resp in ('q','Q'):
+			sys.exit(0)
+		return int(pid), command
 	return None, None
 
 
