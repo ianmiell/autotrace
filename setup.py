@@ -7,7 +7,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 setup(
     name='autotrace',
- version='0.0.23',
+ version='0.0.24',
     description='Trace a command in real time',
     long_description='''Trace any set of commands in real time, manage on one window, record to enable replay.''',
     author='Ian Miell',
