@@ -112,7 +112,7 @@ class PexpectSessionManager(object):
 	def write_to_manager_logfile(self, msg):
 		if type(msg) is PasteEvent:
 			msg = str(msg)
-		assert isinstance(msg, str)
+		assert isinstance(msg, unicode), str(type(msg))
 		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
@@ -989,7 +989,8 @@ def main():
 			assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
 			pexpect.run('kill -CONT ' + str(main_command_session.pid))
 			while True:
-				os.system('stty -echo')
+				# TODO: doesn't reset if set back on
+				#os.system('stty -echo')
 				try:
 					while True:
 						pexpect_session_manager.draw_screen('sessions',quick_help=pexpect_session_manager.get_quick_help())
