@@ -9,6 +9,7 @@ import re
 import pexpect
 import curtsies
 from curtsies.fmtfuncs import black, yellow, magenta, cyan, gray, blue, red, green, on_black, on_dark, on_red, on_green, on_yellow, on_blue, on_magenta, on_cyan, on_gray, bold, dark, underline, blink, invert, plain
+from curtsies.events import PasteEvent
 from curtsies.input import Input
 
 # Example code for debug/breakpoint
@@ -21,18 +22,9 @@ PY3 = sys.version_info[0] >= 3
 if PY3:
 	unicode = str
 
-# TODO: remove cursor (how?)
-# TODO: replay function?
-#       - put elapsed time in before each line
-#       - replayer will 'just' read through the output files in the logs
-#       - replayer should therefore take 'replay' and 'logfolder' as an argument
-#       - it will work by, for each logfile:
-#         - start a autotrace process (because we know autotrace will be installed) that:
-#           - reads next line, gobble the time and the type, wait that long and echo the line to stdout
-#           - should the first line of the logfile be the command name?
+# TODO: remove cursor/turn echo off (how?)
 # TODO: BUG - down doesn't work at end of first screen
 # TODO: tar up logfiles as a bug report
-
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -118,6 +110,9 @@ class PexpectSessionManager(object):
 			self.screen_arr[y:y+1,0:len(line)] = [line]
 
 	def write_to_manager_logfile(self, msg):
+		if type(msg) is PasteEvent:
+			msg = str(msg)
+		assert isinstance(msg, str)
 		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
 		self.logfile.flush()
 
@@ -187,6 +182,7 @@ class PexpectSessionManager(object):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
 		print(msg + self.get_state_for_user())
+		os.system('stty echo')
 		sys.exit(0)
 
 	def get_state_for_user(self):
@@ -252,6 +248,8 @@ class PexpectSessionManager(object):
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
+			if type(input_char) == PasteEvent:
+				input_char = str(input_char)[-1]
 			if input_char:
 				self.write_to_manager_logfile('input_char: ' + input_char)
 			if input_char in quit_chars:
@@ -991,6 +989,7 @@ def main():
 			assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
 			pexpect.run('kill -CONT ' + str(main_command_session.pid))
 			while True:
+				os.system('stty -echo')
 				try:
 					while True:
 						pexpect_session_manager.draw_screen('sessions',quick_help=pexpect_session_manager.get_quick_help())
@@ -999,7 +998,8 @@ def main():
 				except KeyboardInterrupt:
 					pexpect_session_manager.draw_screen('clearscreen',quick_help=pexpect_session_manager.get_quick_help())
 					pexpect_session_manager.refresh_window()
-
+					pexpect_session_manager.quit_autotrace('Interrupt detected.')
+			
 ################################################################################
 # Basic flow of application
 ################################################################################
@@ -1013,7 +1013,6 @@ def main():
 # handle_input
 # 	(can also) draw_screen
 ################################################################################
-
 
 autotrace_version='0.0.8'
 if __name__ == '__main__':
