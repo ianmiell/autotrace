@@ -109,7 +109,7 @@ class PexpectSessionManager(object):
 			self.screen_arr[y:y+1,0:len(line)] = [line]
 
 	def write_to_manager_logfile(self, msg):
-		if type(msg) is PasteEvent:
+		if isinstance(msg, PasteEvent):
 			msg = str(msg)
 		assert isinstance(msg, unicode), str(type(msg))
 		self.logfile.write(self.get_elapsed_time_str() + ' ' + str(msg) + '\n')
@@ -247,7 +247,7 @@ class PexpectSessionManager(object):
 		quit_chars = (u'<ESC>', u'<Ctrl-d>', u'q')
 		with Input() as input_generator:
 			input_char = input_generator.send(self.timeout_delay)
-			if type(input_char) == PasteEvent:
+			if isinstance(input_char, PasteEvent):
 				input_char = str(input_char)[-1]
 			if input_char:
 				self.write_to_manager_logfile('input_char: ' + input_char)
@@ -879,9 +879,9 @@ def process_args():
 			args.commands.append("""echo bg command being tracked is: """ + command)
 		args.commands.append('iostat 1')
 		if pid is not None and platform.system() != 'Darwin':
- 			args.commands.append("""bash -c 'while true; do cat /proc/""" + str(pid) + """/status; sleep 2; done""")
+			args.commands.append("""bash -c 'while true; do cat /proc/""" + str(pid) + """/status; sleep 2; done""")
 		elif pid is None and platform.system() != 'Darwin':
- 			args.commands.append("""bash -c 'while true; do cat /proc/PID/status; sleep 2; done""")
+			args.commands.append("""bash -c 'while true; do cat /proc/PID/status; sleep 2; done""")
 		args.commands.append('vmstat 1')
 	# Validate END
 	# BUG! if logtimestep is false it's broked - is it?
