@@ -24,7 +24,7 @@ if PY3:
 
 # TODO: remove cursor/turn echo off (how?)
 # TODO: BUG - down doesn't work at end of first screen
-# TODO: tar up logfiles as a bug report
+# TODO: tar up logfiles as a bug report
 
 class PexpectSessionManager(object):
 	# Singleton
@@ -999,7 +999,7 @@ def main():
 					pexpect_session_manager.draw_screen('clearscreen',quick_help=pexpect_session_manager.get_quick_help())
 					pexpect_session_manager.refresh_window()
 					pexpect_session_manager.quit_autotrace('Interrupt detected.')
-			
+
 ################################################################################
 # Basic flow of application
 ################################################################################
