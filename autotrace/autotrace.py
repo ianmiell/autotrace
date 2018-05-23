@@ -28,7 +28,7 @@ if PY3:
 class PexpectSessionManager(object):
 	# Singleton
 	only_one = None
-	def __init__(self, logdir=None, debug=False, encoding='utf-8'):
+	def __init__(self, logdir=None, debug=False, encoding='utf-8', timesync=True):
 		"""
 
 		only_one             -
@@ -50,6 +50,7 @@ class PexpectSessionManager(object):
 		self.zoomed_session       = None
 		self.trigger_debug        = False
 		self.pointers_fixed       = False
+		self.timesync             = timesync
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -211,11 +212,12 @@ class PexpectSessionManager(object):
 				break
 		# Determine which ones saw output.
 		# The ones that did not need to 'fake read' a line of type 'display_sync_line'
-		assert seen_output or all_done
-		if seen_output:
-			for session in self.pexpect_sessions:
-				if not lines_seen[session]:
-					session.append_output_line('','display_sync_line')
+		if self.timesync:
+			assert seen_output or all_done
+			if seen_output:
+				for session in self.pexpect_sessions:
+					if not lines_seen[session]:
+						session.append_output_line('','display_sync_line')
 
 	def get_quick_help(self):
 		if self.status == 'Running':
@@ -852,6 +854,7 @@ def process_args():
 	parser.add_argument('commands', type=str, nargs='*', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
 	parser.add_argument('-v', action='store_const', const=True, default=None, help='Split vertically rather than horizontally (the default).')
+	parser.add_argument('-s', action='store_const', const=True, default=None, help='Turn off sync output by time')
 	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
 	parser.add_argument('--replay', nargs='?', help='Replay output of a folder. Optionally, you can give the pid of the process that is in the filenames if there are more than one set of logfiles in the folder.')
 	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
@@ -883,6 +886,8 @@ def process_args():
 		elif pid is None and platform.system() != 'Darwin':
 			args.commands.append("""bash -c 'while true; do cat /proc/PID/status; sleep 2; done""")
 		args.commands.append('vmstat 1')
+	if args.s is None:
+		args.s = False
 	# Validate END
 	# BUG! if logtimestep is false it's broked - is it?
 	#args.logtimestep = True
@@ -1025,7 +1030,8 @@ def replay_dir(pexpect_session_manager, args):
 
 def main():
 	args = process_args()
-	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d)
+	timesync = not args.s
+	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d, timesync=timesync)
 	if args.replayfile:
 		replay_file(pexpect_session_manager, args.replayfile[0])
 	else:
