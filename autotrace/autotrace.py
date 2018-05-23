@@ -28,7 +28,7 @@ if PY3:
 class PexpectSessionManager(object):
 	# Singleton
 	only_one = None
-	def __init__(self, logdir=None, debug=False, encoding='utf-8', timesync=True):
+	def __init__(self, logdir=None, debug=False, encoding='utf-8', timesync=True, colors_on=True):
 		"""
 
 		only_one             -
@@ -51,6 +51,7 @@ class PexpectSessionManager(object):
 		self.trigger_debug        = False
 		self.pointers_fixed       = False
 		self.timesync             = timesync
+		self.colors_on            = colors_on
 		if logdir is not None:
 			assert isinstance(logdir, str)
 			self.logdir               = logdir
@@ -145,11 +146,17 @@ class PexpectSessionManager(object):
 			header_text = 'Autotrace state: ' + invert(self.status) + ', ' + self.status_message
 		else:
 			header_text = 'Autotrace state: ' + invert(self.status)
-		self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
+		if self.colors_on:
+			self.screen_arr[0:1,0:len(header_text)] = [blue(header_text)]
+		else:
+			self.screen_arr[0:1,0:len(header_text)] = [header_text]
 		# Footer
 		space = (self.wwidth - len(quick_help))*' '
 		footer_text = space + quick_help
-		self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [invert(blue(footer_text))]
+		if self.colors_on:
+			self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [invert(blue(footer_text))]
+		else:
+			self.screen_arr[self.wheight-1:self.wheight,0:len(footer_text)] = [invert(footer_text)]
 		# Draw the sessions.
 		if draw_type == 'sessions':
 			# Is there a zoomed session? Just write that one out.
@@ -744,9 +751,15 @@ class PexpectSession(object):
 				# If    this is on the top, and height + top_y value == i (ie this is the last line of the pane)
 				#    OR this is on the bottom (ie top_y is not 1), and height + top_y == i
 				if (top_y == 1 and available_pane_height + top_y == i) or (top_y != 1 and available_pane_height + top_y == i):
-					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
+					if self.pexpect_session_manager.colors_on:
+						self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [cyan(invert(line_obj[0]))]
+					else:
+						self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [invert(line_obj[0])]
 				else:
-					self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [self.session_pane.color(line_obj[0])]
+					if self.pexpect_session_manager.colors_on:
+						self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [self.session_pane.color(line_obj[0])]
+					else:
+						self.pexpect_session_manager.screen_arr[i:i+1, self.session_pane.top_left_x:self.session_pane.top_left_x+len(line_obj[0])] = [line_obj[0]]
 				if not output_lines_end_pane_pointer_has_been_set and self.pexpect_session_manager.pointers_fixed is False:
 					self.output_lines_end_pane_pointer = line_obj[1]
 					output_lines_end_pane_pointer_has_been_set = True
@@ -857,6 +870,7 @@ def process_args():
 	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
 	parser.add_argument('--replay', nargs='?', help='Replay output of a folder. Optionally, you can give the pid of the process that is in the filenames if there are more than one set of logfiles in the folder.')
 	parser.add_argument('--syncoff', action='store_const', const=True, default=None, help='Turn off sync output by time')
+	parser.add_argument('--colorsoff', action='store_const', const=True, default=None, help='Turn off colors')
 	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
@@ -888,6 +902,8 @@ def process_args():
 		args.commands.append('vmstat 1')
 	if args.syncoff is None:
 		args.syncoff = False
+	if args.colorsoff is None:
+		args.colorsoff = False
 	# Validate END
 	# BUG! if logtimestep is false it's broked - is it?
 	#args.logtimestep = True
@@ -1031,7 +1047,8 @@ def replay_dir(pexpect_session_manager, args):
 def main():
 	args = process_args()
 	timesync = not args.syncoff
-	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d, timesync=timesync)
+	colors_on = not args.colorsoff
+	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d, timesync=timesync, colors_on=colors_on)
 	if args.replayfile:
 		replay_file(pexpect_session_manager, args.replayfile[0])
 	else:
