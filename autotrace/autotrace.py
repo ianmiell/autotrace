@@ -854,9 +854,9 @@ def process_args():
 	parser.add_argument('commands', type=str, nargs='*', help='''Commands to autotrace, separated by spaces, eg: "autotrace 'find /' 'strace -p PID' 'vmstat 1'"''')
 	parser.add_argument('-l', default=None, help='Folder to log output of commands to.')
 	parser.add_argument('-v', action='store_const', const=True, default=None, help='Split vertically rather than horizontally (the default).')
-	parser.add_argument('-s', action='store_const', const=True, default=None, help='Turn off sync output by time')
 	parser.add_argument('-d', action='store_const', const=True, default=None, help='Debug mode')
 	parser.add_argument('--replay', nargs='?', help='Replay output of a folder. Optionally, you can give the pid of the process that is in the filenames if there are more than one set of logfiles in the folder.')
+	parser.add_argument('--syncoff', action='store_const', const=True, default=None, help='Turn off sync output by time')
 	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
@@ -886,8 +886,8 @@ def process_args():
 		elif pid is None and platform.system() != 'Darwin':
 			args.commands.append("""bash -c 'while true; do cat /proc/PID/status; sleep 2; done""")
 		args.commands.append('vmstat 1')
-	if args.s is None:
-		args.s = False
+	if args.syncoff is None:
+		args.syncoff = False
 	# Validate END
 	# BUG! if logtimestep is false it's broked - is it?
 	#args.logtimestep = True
@@ -1030,7 +1030,7 @@ def replay_dir(pexpect_session_manager, args):
 
 def main():
 	args = process_args()
-	timesync = not args.s
+	timesync = not args.syncoff
 	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d, timesync=timesync)
 	if args.replayfile:
 		replay_file(pexpect_session_manager, args.replayfile[0])
