@@ -171,7 +171,8 @@ class PexpectSessionManager(object):
 		elif draw_type == 'clearscreen':
 			self.clear_screen_arr()
 		if not self.debug:
-			self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
+			#self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
+			self.window.render_to_terminal(self.screen_arr, cursor_pos=(0,0))
 
 	def draw_help(self):
 		help_text_lines = self.get_state_for_user().split('\n')
