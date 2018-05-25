@@ -17,7 +17,7 @@ autotrace 'ping google.com' 'strace -p PID' 'any other commands' ...
 
 ![Demo](https://raw.githubusercontent.com/ianmiell/autotrace/master/demo.gif)
 
-See ![here](https://zwischenzugs.com/2018/05/21/autotrace-debug-on-steroids/) for more.
+See [here](https://zwischenzugs.com/2018/05/21/autotrace-debug-on-steroids/) for more.
 
 ## Features:
 
