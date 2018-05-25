@@ -28,7 +28,7 @@ if PY3:
 class PexpectSessionManager(object):
 	# Singleton
 	only_one = None
-	def __init__(self, logdir=None, debug=False, encoding='utf-8', timesync=True, colors_on=True):
+	def __init__(self, logdir=None, debug=False, encoding='utf-8', timesync=True, colors_on=True, replayspeed=1.0):
 		"""
 
 		only_one             -
@@ -70,7 +70,8 @@ class PexpectSessionManager(object):
 		# Setup
 		self.refresh_window()
 		self.start_time            = time.time()
-		self.paused_total_time     = 0.0 # TODO: start and stop paused timer on start and stop pause.
+		self.output_last_seen      = self.start_time
+		self.replayspeed           = replayspeed
 		self.screen_arr            = None
 		self.vertically_split      = False
 
@@ -892,6 +893,7 @@ def process_args():
 	parser.add_argument('--syncoff', action='store_const', const=True, default=None, help='Turn off sync output by time')
 	parser.add_argument('--colorsoff', action='store_const', const=True, default=None, help='Turn off colors')
 	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
+	parser.add_argument('--replayspeed', type=float, default=1.0, help='Replay output of an individual file')
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
@@ -919,7 +921,8 @@ def process_args():
 			args.commands.append("""bash -c 'while true; do cat /proc/""" + str(pid) + """/status; sleep 2; done""")
 		elif pid is None and platform.system() != 'Darwin':
 			args.commands.append("""bash -c 'while true; do cat /proc/PID/status; sleep 2; done""")
-		args.commands.append('vmstat 1')
+		if pid is not None and platform.system() != 'Darwin':
+			args.commands.append('vmstat 1')
 	if args.syncoff is None:
 		args.syncoff = False
 	if args.colorsoff is None:
@@ -1020,6 +1023,8 @@ def replay_file(pexpect_session_manager, filename):
 		assert len(line_list) > 0
 		elapsed_time = float(line_list[0])
 		time_to_wait = elapsed_time - last_time_seen
+		# Adjust time to wait based on speed specified
+		time_to_wait *= 1.0/pexpect_session_manager.replayspeed
 		last_time_seen = elapsed_time
 		time.sleep(time_to_wait)
 		line_type = line_list[1]
@@ -1030,7 +1035,7 @@ def replay_file(pexpect_session_manager, filename):
 
 def replay_dir(pexpect_session_manager, args):
 	# For each file in the directory that matches the spec, spin up a session that runs:
-	# autotrace --replayfile <FILENAME>
+	# autotrace --replayfile <FILENAME> --replayspeed <REPLAYSPEED>
 	if isinstance(args.replay, str):
 		spec = [args.replay]
 	else:
@@ -1060,7 +1065,7 @@ def replay_dir(pexpect_session_manager, args):
 	# 0 is the main session, 1,2, etc
 	for c in range(0,len(logfilenames_dict)):
 		logfilename = logfilenames_dict[c]
-		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + replaydir + '/' + logfilename
+		session_command = sys.executable + ' ' + sys.argv[0] + ' --replayfile ' + replaydir + '/' + logfilename + ' --replayspeed ' + str(args.replayspeed)
 		args.commands.append(session_command)
 
 
@@ -1068,7 +1073,7 @@ def main():
 	args = process_args()
 	timesync = not args.syncoff
 	colors_on = not args.colorsoff
-	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d, timesync=timesync, colors_on=colors_on)
+	pexpect_session_manager=PexpectSessionManager(args.l, debug=args.d, timesync=timesync, colors_on=colors_on, replayspeed=args.replayspeed)
 	if args.replayfile:
 		replay_file(pexpect_session_manager, args.replayfile[0])
 	else:
