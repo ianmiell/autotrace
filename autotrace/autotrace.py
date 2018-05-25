@@ -893,7 +893,7 @@ def process_args():
 	parser.add_argument('--syncoff', action='store_const', const=True, default=None, help='Turn off sync output by time')
 	parser.add_argument('--colorsoff', action='store_const', const=True, default=None, help='Turn off colors')
 	parser.add_argument('--replayfile', nargs=1, help='Replay output of an individual file')
-	parser.add_argument('--replayspeed', type=float, default=1.0, help='Replay output of an individual file')
+	parser.add_argument('--replayspeed', type=float, default=1.0, help='Speed to replay at, eg 0.5 == half speed, 2 == double')
 	parser.add_argument('--logtimestep',action='store_const', const=True, default=False,  help='Log each second tick in the output')
 	args = parser.parse_args()
 	# Validate BEGIN
