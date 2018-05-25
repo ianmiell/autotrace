@@ -11,6 +11,8 @@ sudo autotrace 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 20000'
 
 ![Demo](https://raw.githubusercontent.com/ianmiell/autotrace/master/demo.gif)
 
+See ![here](https://zwischenzugs.com/2018/05/21/autotrace-debug-on-steroids/) for more.
+
 ## Features:
 
 - Pause program in-flight to see what's going on

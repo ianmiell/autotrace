@@ -190,7 +190,6 @@ class PexpectSessionManager(object):
 		self.screen_arr = curtsies.FSArray(self.wheight, self.wwidth)
 		self.window.render_to_terminal(self.screen_arr)
 		print(msg + self.get_state_for_user())
-		os.system('stty echo')
 		sys.exit(0)
 
 	def get_state_for_user(self):
@@ -1066,7 +1065,7 @@ def main():
 			assert main_command_session, pexpect_session_manager.quit_autotrace('No main command session set up!')
 			pexpect.run('kill -CONT ' + str(main_command_session.pid))
 			while True:
-				# TODO: doesn't reset if set back on
+				# TODO: doesn't reset if set back on?
 				#os.system('stty -echo')
 				try:
 					while True:
