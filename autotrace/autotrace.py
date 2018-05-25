@@ -172,18 +172,24 @@ class PexpectSessionManager(object):
 			self.clear_screen_arr()
 		if not self.debug:
 			#self.window.render_to_terminal(self.screen_arr, cursor_pos=(self.wheight, self.wwidth))
-			self.window.render_to_terminal(self.screen_arr, cursor_pos=(0,0))
+			self.window.render_to_terminal(self.screen_arr, cursor_pos=(0,int(self.wwidth/4*3)))
 
 	def draw_help(self):
 		help_text_lines = self.get_state_for_user().split('\n')
+		help_text_lines.append('')
+		help_text_lines.append('')
+		help_text_lines.append('Options:')
+		help_text_lines.append('')
+		help_text_lines.append('t: toggle timesync of panes (currently: ' + str(self.timesync) + ')')
+		help_text_lines.append('l: toggle colors (currently: ' + str(self.colors_on) + ')')
 		i=2
 		for line in help_text_lines:
 			while len(line) > self.wwidth-1:
 				line = line[:self.wwidth-1]
-				self.screen_arr[i:i+1,0:len(line)] = [green(line)]
+				self.screen_arr[i:i+1,0:len(line)] = [(line)]
 				line = line[self.wwidth:]
 				i += 1
-			self.screen_arr[i:i+1,0:len(line)] = [green(line)]
+			self.screen_arr[i:i+1,0:len(line)] = [(line)]
 			i += 1
 
 	def quit_autotrace(self, msg='All done.'):
@@ -238,9 +244,9 @@ class PexpectSessionManager(object):
 						zoom_str += str(i)
 			if number_of_sessions > 4:
 				if self.zoomed_session:
-					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, z: zoom out, h: help =>  '
+					quick_help = 'q/ESC/C-d:quit, p:pause, c:continue, r:refresh, z:zoom out, h:help =>  '
 				else:
-					quick_help = 'q/ESC/C-d: quit, p: pause, c: continue, r: refresh, m: cycle windows, ' + zoom_str + ': zoom, h: help =>  '
+					quick_help = 'q/ESC/C-d:quit, p:pause, c:continue, r:refresh, m:cycle windows, ' + zoom_str + ':zoom, h:help =>  '
 			else:
 				quick_help = 'q/ESC/C-d: quit, p: pause, r: refresh, h: help =>  '
 		elif self.status == 'Paused':
@@ -274,6 +280,10 @@ class PexpectSessionManager(object):
 				self.zoomed_session = None
 				self.do_layout('default')
 				self.draw_screen('sessions',quick_help=self.get_quick_help())
+			elif input_char in (u't',):
+				self.timesync = not self.timesync
+			elif input_char in (u'l',):
+				self.colors_on = not self.colors_on
 			elif input_char in [str(x) for x in range(0,len(self.pexpect_sessions))]:
 				if self.zoomed_session is None:
 					# Only accept if pane is assigned to this session.
@@ -333,6 +343,10 @@ class PexpectSessionManager(object):
 						self.status_message = 'you just hit forward ' + msg
 						self.draw_screen('sessions',quick_help=self.get_quick_help())
 						self.pointers_fixed = False
+					elif e in (u't',):
+						self.timesync = not self.timesync
+					elif e in (u'l',):
+						self.colors_on = not self.colors_on
 					else:
 						self.write_to_manager_logfile('input_char unhandled in paused: ' + input_char)
 			elif input_char in (u'h',):
@@ -349,6 +363,12 @@ class PexpectSessionManager(object):
 						self.quit_autotrace()
 					elif e in (u'd',):
 						self.trigger_debug = True
+					elif e in (u't',):
+						self.timesync = not self.timesync
+						self.draw_screen('help',quick_help=self.get_quick_help())
+					elif e in (u'l',):
+						self.colors_on = not self.colors_on
+						self.draw_screen('help',quick_help=self.get_quick_help())
 					elif e in (u'r',):
 						self.draw_screen('clearscreen',quick_help=self.get_quick_help())
 						self.status_message = 'you just refreshed ' + msg
