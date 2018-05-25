@@ -656,8 +656,6 @@ class PexpectSession(object):
 			pexpect_session_manager.main_command_session = self
 		if pane_name:
 			self.session_pane              = SessionPane(pane_name, pane_color)
-			self.session_pane.top_left     = (-1,-1)
-			self.session_pane.bottom_right = (-1,-1)
 		assert isinstance(self.session_number, int)
 
 
