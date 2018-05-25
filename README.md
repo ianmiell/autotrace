@@ -3,10 +3,16 @@
 Runs a process, and gives you the output along with other telemetry on the
 process, all in one terminal window.
 
-Here's me seeing what nmap does by looking at strace and tcpdump, with the command:
+Here's me seeing what `ping google.com` (after 'forgetting' to run it under `autotrace`) does by looking at strace and tcpdump, with the command:
 
 ```
-sudo autotrace 'nmap meirionconsulting.com' 'strace -p PID' 'tcpdump -XXs 20000'
+autotrace
+```
+
+You can also run:
+
+```
+autotrace 'ping google.com' 'strace -p PID' 'any other commands' ...
 ```
 
 ![Demo](https://raw.githubusercontent.com/ianmiell/autotrace/master/demo.gif)
